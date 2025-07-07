@@ -1,4 +1,3 @@
-// utils/historicalData.js
 // Historical S&P 500 monthly data from your provided file
 
 export const historicalSP500Data = [

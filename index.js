@@ -20,8 +20,8 @@ export default function Welcome() {
         {/* Header */}
         <View style={styles.header}>
           <Ionicons name="trending-up" size={64} color="#4facfe" />
-          <Text style={styles.title}>Market Timer</Text>
-          <Text style={styles.subtitle}>Can you beat the market?</Text>
+          <Text style={styles.title} accessibilityLabel="app-title">Market Timer</Text>
+          <Text style={styles.subtitle} accessibilityLabel="app-subtitle">Can you beat the market?</Text>
         </View>
 
         {/* Game Description */}
@@ -94,7 +94,7 @@ export default function Welcome() {
         </View>
 
         {/* Play Button */}
-        <Pressable style={styles.playButton} onPress={handlePlayPress}>
+        <Pressable style={styles.playButton} onPress={handlePlayPress} testID="start-challenge-button">
           <LinearGradient
             colors={['#4facfe', '#00f2fe']}
             style={styles.playGradient}
