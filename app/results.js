@@ -1,392 +1,214 @@
 // app/results.js
-// Results screen showing portfolio performance and trade history
+// Results screen showing final comparison
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, RefreshControl } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import Toast from 'react-native-toast-message';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { resultsStyles } from '../styles/resultsStyles';
 
-import ChartLine from '../components/ChartLine';
-import MetricCard from '../components/MetricCard';
-import { 
-  loadPortfolio, 
-  loadPriceData, 
-  loadTradeHistory, 
-  loadStrategy 
-} from '../utils/storage';
-import { calculateBuyAndHold } from '../utils/generator';
-
-export default function Results() {
-  const [portfolio, setPortfolio] = useState(null);
-  const [priceData, setPriceData] = useState([]);
-  const [tradeHistory, setTradeHistory] = useState([]);
-  const [strategy, setStrategy] = useState(null);
-  const [buyHoldComparison, setBuyHoldComparison] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [showTrades, setShowTrades] = useState(false);
+export default function ResultsScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  
+  // Mock data for now - in a real app, this would come from game state
+  const [results, setResults] = useState({
+    playerValue: 15420,
+    buyHoldValue: 18750,
+    startingValue: 10000,
+    playerReturn: 54.2,
+    buyHoldReturn: 87.5,
+    didWin: false,
+    years: 30,
+    trades: 24
+  });
 
   useEffect(() => {
-    loadResultsData();
+    // Calculate results from game data
+    // For now using mock data, but this would be populated from the actual game
+    const playerValue = 15420; // Would come from final portfolio value
+    const buyHoldValue = 18750; // Would come from buy-and-hold calculation
+    const startingValue = 10000;
+    
+    const playerReturn = ((playerValue - startingValue) / startingValue) * 100;
+    const buyHoldReturn = ((buyHoldValue - startingValue) / startingValue) * 100;
+    const didWin = playerValue > buyHoldValue;
+    
+    setResults({
+      playerValue,
+      buyHoldValue,
+      startingValue,
+      playerReturn,
+      buyHoldReturn,
+      didWin,
+      years: 30,
+      trades: 24
+    });
   }, []);
-
-  const loadResultsData = async () => {
-    try {
-      setIsLoading(true);
-
-      // Load all data
-      const [portfolioData, prices, trades, strategyData] = await Promise.all([
-        loadPortfolio(),
-        loadPriceData(),
-        loadTradeHistory(),
-        loadStrategy()
-      ]);
-
-      setPortfolio(portfolioData);
-      setPriceData(prices || []);
-      setTradeHistory(trades || []);
-      setStrategy(strategyData);
-
-      // Calculate buy and hold comparison
-      if (prices && prices.length > 0) {
-        const buyHold = calculateBuyAndHold(prices, 10000);
-        setBuyHoldComparison(buyHold);
-      }
-
-    } catch (error) {
-      console.error('Error loading results data:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to load results data',
-      });
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadResultsData();
-  };
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 2,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(value);
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
+  const formatPercentage = (value) => {
+    const sign = value >= 0 ? '+' : '';
+    return `${sign}${value.toFixed(1)}%`;
   };
 
-  const getPerformanceColor = (value) => {
-    if (value > 0) return '#38ef7d';
-    if (value < 0) return '#ff6b6b';
-    return '#8e8e93';
+  const playAgain = () => {
+    router.push('/game');
   };
 
-  // Prepare chart data
-  const chartData = priceData.map((price, index) => ({
-    value: portfolio ? (portfolio.cash + (portfolio.shares * price.price)) : 10000,
-    date: price.date
-  }));
-
-  const buyHoldChartData = buyHoldComparison ? priceData.map((price, index) => ({
-    value: (10000 / priceData[0].price) * price.price,
-    date: price.date
-  })) : null;
-
-  if (isLoading) {
-    return (
-      <LinearGradient colors={['#1a1a2e', '#16213e']} style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading results...</Text>
-        </View>
-      </LinearGradient>
-    );
-  }
-
-  if (!portfolio || !priceData.length) {
-    return (
-      <LinearGradient colors={['#1a1a2e', '#16213e']} style={styles.container}>
-        <View style={styles.noDataContainer}>
-          <Ionicons name="analytics-outline" size={64} color="#8e8e93" />
-          <Text style={styles.noDataTitle}>No Results Yet</Text>
-          <Text style={styles.noDataText}>
-            Run a trading simulation to see your performance results
-          </Text>
-        </View>
-      </LinearGradient>
-    );
-  }
-
-  const outperformance = buyHoldComparison 
-    ? portfolio.totalReturnPercent - buyHoldComparison.totalReturnPercent 
-    : 0;
+  const goHome = () => {
+    router.push('/');
+  };
 
   return (
-    <LinearGradient colors={['#1a1a2e', '#16213e']} style={styles.container}>
-      <ScrollView 
-        style={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
+    <LinearGradient colors={['#1a1a2e', '#16213e']} style={resultsStyles.container}>
+      <View style={resultsStyles.content}>
+        
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Performance Results</Text>
-          <Text style={styles.subtitle}>Your strategy vs. buy & hold</Text>
-        </View>
-
-        {/* Performance Chart */}
-        <ChartLine
-          data={chartData}
-          compareData={buyHoldChartData}
-          title="Portfolio Performance Over Time"
-          height={280}
-        />
-
-        {/* Performance Metrics */}
-        <View style={styles.metricsContainer}>
-          <Text style={styles.sectionTitle}>Performance Summary</Text>
-          
-          <MetricCard
-            title="Your Strategy Return"
-            value={`${portfolio.totalReturnPercent >= 0 ? '+' : ''}${portfolio.totalReturnPercent.toFixed(2)}%`}
-            subtitle={formatCurrency(portfolio.totalReturn)}
-            color={getPerformanceColor(portfolio.totalReturn)}
-          />
-
-          {buyHoldComparison && (
-            <MetricCard
-              title="Buy & Hold Return"
-              value={`${buyHoldComparison.totalReturnPercent >= 0 ? '+' : ''}${buyHoldComparison.totalReturnPercent.toFixed(2)}%`}
-              subtitle={formatCurrency(buyHoldComparison.totalReturn)}
-              color={getPerformanceColor(buyHoldComparison.totalReturn)}
-            />
-          )}
-
-          <MetricCard
-            title="Outperformance"
-            value={`${outperformance >= 0 ? '+' : ''}${outperformance.toFixed(2)}%`}
-            subtitle={outperformance >= 0 ? 'You beat the market!' : 'Market beat your timing'}
-            color={getPerformanceColor(outperformance)}
-          />
-
-          <MetricCard
-            title="Total Trades"
-            value={tradeHistory.length.toString()}
-            subtitle="Executed during simulation"
-            color="#4facfe"
-          />
-        </View>
-
-        {/* Trade History Toggle */}
-        <Pressable 
-          style={styles.tradeToggle}
-          onPress={() => setShowTrades(!showTrades)}
-        >
-          <Text style={styles.tradeToggleText}>
-            {showTrades ? 'Hide' : 'Show'} Trade History
-          </Text>
+        <View style={resultsStyles.header}>
           <Ionicons 
-            name={showTrades ? 'chevron-up' : 'chevron-down'} 
-            size={20} 
-            color="#4facfe" 
+            name={results.didWin ? "trophy" : "medal"} 
+            size={64} 
+            color={results.didWin ? "#ffd700" : "#c0c0c0"} 
           />
-        </Pressable>
+          <Text style={resultsStyles.title}>
+            {results.didWin ? "You Beat the Market!" : "Market Wins This Time"}
+          </Text>
+          <Text style={resultsStyles.subtitle}>
+            {results.didWin 
+              ? "Congratulations on your market timing skills!" 
+              : "Market timing is harder than it looks!"
+            }
+          </Text>
+        </View>
 
-        {/* Trade History */}
-        {showTrades && (
-          <View style={styles.tradeHistory}>
-            <Text style={styles.sectionTitle}>Trade History</Text>
-            {tradeHistory.length === 0 ? (
-              <Text style={styles.noTradesText}>No trades executed</Text>
-            ) : (
-              tradeHistory.map((trade, index) => (
-                <View key={index} style={styles.tradeItem}>
-                  <View style={styles.tradeInfo}>
-                    <View style={styles.tradeHeader}>
-                      <Text style={[
-                        styles.tradeAction,
-                        { color: trade.action === 'buy' ? '#38ef7d' : '#ff6b6b' }
-                      ]}>
-                        {trade.action.toUpperCase()}
-                      </Text>
-                      <Text style={styles.tradeDate}>{formatDate(trade.date)}</Text>
-                    </View>
-                    <Text style={styles.tradeDetails}>
-                      {formatCurrency(trade.amount)} at {formatCurrency(trade.price)}
-                    </Text>
-                    <Text style={styles.tradeShares}>
-                      {trade.shares.toFixed(4)} shares • Cash: {formatCurrency(trade.cash)}
-                    </Text>
-                  </View>
-                </View>
-              ))
-            )}
-          </View>
-        )}
-
-        {/* Strategy Summary */}
-        {strategy && (
-          <View style={styles.strategySummary}>
-            <Text style={styles.sectionTitle}>Strategy Used</Text>
-            <Text style={styles.strategyText}>
-              {strategy.action === 'buy' ? 'Bought' : 'Sold'} {formatCurrency(strategy.amount)} 
-              {' '}on the {strategy.timing === 'first' ? 'first' : strategy.timing === 'middle' ? 'middle' : 'end'} of each month
+        {/* Results Comparison */}
+        <View style={resultsStyles.resultsSection}>
+          <Text style={resultsStyles.sectionTitle}>Final Results</Text>
+          
+          {/* Your Strategy */}
+          <View style={resultsStyles.resultCard}>
+            <View style={resultsStyles.resultHeader}>
+              <Text style={resultsStyles.resultLabel}>Your Strategy</Text>
+              <Text style={[
+                resultsStyles.resultValue,
+                { color: results.playerReturn >= 0 ? '#38ef7d' : '#ff6b6b' }
+              ]}>
+                {formatCurrency(results.playerValue)}
+              </Text>
+            </View>
+            <Text style={[
+              resultsStyles.resultReturn,
+              { color: results.playerReturn >= 0 ? '#38ef7d' : '#ff6b6b' }
+            ]}>
+              {formatPercentage(results.playerReturn)} return
+            </Text>
+            <Text style={resultsStyles.resultDetail}>
+              {results.trades} trades over {results.years} years
             </Text>
           </View>
-        )}
-      </ScrollView>
-      
-      <Toast />
+
+          {/* Buy & Hold */}
+          <View style={resultsStyles.resultCard}>
+            <View style={resultsStyles.resultHeader}>
+              <Text style={resultsStyles.resultLabel}>Buy & Hold</Text>
+              <Text style={[
+                resultsStyles.resultValue,
+                { color: results.buyHoldReturn >= 0 ? '#38ef7d' : '#ff6b6b' }
+              ]}>
+                {formatCurrency(results.buyHoldValue)}
+              </Text>
+            </View>
+            <Text style={[
+              resultsStyles.resultReturn,
+              { color: results.buyHoldReturn >= 0 ? '#38ef7d' : '#ff6b6b' }
+            ]}>
+              {formatPercentage(results.buyHoldReturn)} return
+            </Text>
+            <Text style={resultsStyles.resultDetail}>
+              Never sold, just held for {results.years} years
+            </Text>
+          </View>
+
+          {/* Difference */}
+          <View style={[
+            resultsStyles.differenceCard,
+            { backgroundColor: results.didWin ? 'rgba(56, 239, 125, 0.1)' : 'rgba(255, 107, 107, 0.1)' }
+          ]}>
+            <Text style={resultsStyles.differenceLabel}>Difference</Text>
+            <Text style={[
+              resultsStyles.differenceValue,
+              { color: results.didWin ? '#38ef7d' : '#ff6b6b' }
+            ]}>
+              {results.didWin ? '+' : ''}{formatCurrency(results.playerValue - results.buyHoldValue)}
+            </Text>
+            <Text style={[
+              resultsStyles.differencePercent,
+              { color: results.didWin ? '#38ef7d' : '#ff6b6b' }
+            ]}>
+              {formatPercentage(results.playerReturn - results.buyHoldReturn)} vs buy & hold
+            </Text>
+          </View>
+        </View>
+
+        {/* Stats */}
+        <View style={resultsStyles.statsSection}>
+          <Text style={resultsStyles.sectionTitle}>Game Stats</Text>
+          <View style={resultsStyles.statsGrid}>
+            <View style={resultsStyles.statItem}>
+              <Text style={resultsStyles.statNumber}>{results.years}</Text>
+              <Text style={resultsStyles.statLabel}>Years</Text>
+            </View>
+            <View style={resultsStyles.statItem}>
+              <Text style={resultsStyles.statNumber}>{results.trades}</Text>
+              <Text style={resultsStyles.statLabel}>Trades</Text>
+            </View>
+            <View style={resultsStyles.statItem}>
+              <Text style={resultsStyles.statNumber}>{formatCurrency(results.startingValue)}</Text>
+              <Text style={resultsStyles.statLabel}>Started</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Fun Fact */}
+        <View style={resultsStyles.factSection}>
+          <Text style={resultsStyles.factTitle}>💡 Fun Fact</Text>
+          <Text style={resultsStyles.factText}>
+            {results.didWin 
+              ? "You're in the minority! Studies show that over 80% of professional fund managers fail to beat the market consistently over long periods."
+              : "You're in good company! Even professional fund managers struggle to beat a simple buy-and-hold strategy over the long term."
+            }
+          </Text>
+        </View>
+
+        {/* Action Buttons */}
+        <View style={resultsStyles.actionSection}>
+          <Pressable style={resultsStyles.playAgainButton} onPress={playAgain}>
+            <LinearGradient
+              colors={['#4facfe', '#00f2fe']}
+              style={resultsStyles.playAgainGradient}
+            >
+              <Ionicons name="refresh" size={20} color="#fff" />
+              <Text style={resultsStyles.playAgainText}>Play Again</Text>
+            </LinearGradient>
+          </Pressable>
+          
+          <Pressable style={resultsStyles.homeButton} onPress={goHome}>
+            <Ionicons name="home" size={20} color="#fff" />
+            <Text style={resultsStyles.homeButtonText}>Home</Text>
+          </Pressable>
+        </View>
+
+      </View>
     </LinearGradient>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: '#8e8e93',
-    fontSize: 16,
-  },
-  noDataContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
-  noDataTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  noDataText: {
-    fontSize: 16,
-    color: '#8e8e93',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 5,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#8e8e93',
-    textAlign: 'center',
-  },
-  metricsContainer: {
-    marginVertical: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 15,
-    marginTop: 10,
-  },
-  tradeToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 15,
-    backgroundColor: 'rgba(79, 172, 254, 0.1)',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(79, 172, 254, 0.3)',
-    marginVertical: 10,
-    gap: 8,
-  },
-  tradeToggleText: {
-    color: '#4facfe',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  tradeHistory: {
-    marginTop: 10,
-  },
-  noTradesText: {
-    color: '#8e8e93',
-    textAlign: 'center',
-    fontStyle: 'italic',
-    marginTop: 10,
-  },
-  tradeItem: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  tradeInfo: {
-    flex: 1,
-  },
-  tradeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  tradeAction: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  tradeDate: {
-    fontSize: 12,
-    color: '#8e8e93',
-  },
-  tradeDetails: {
-    fontSize: 14,
-    color: '#fff',
-    marginBottom: 2,
-  },
-  tradeShares: {
-    fontSize: 12,
-    color: '#8e8e93',
-  },
-  strategySummary: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    padding: 20,
-    marginTop: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  strategyText: {
-    fontSize: 14,
-    color: '#8e8e93',
-    lineHeight: 20,
-  },
-});

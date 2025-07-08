@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react-native';
+// __tests__/index.test.js
+import { render, screen, waitFor } from '@testing-library/react-native';
 import { userEvent } from '@testing-library/react-native';
-import HomeScreen from '../index';
+import HomeScreen from '../app/index'; // Fixed import path
 
 // Mock the router
 const mockPush = jest.fn();
@@ -8,6 +9,36 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: mockPush,
   }),
+}));
+
+// Mock the styles
+jest.mock('../styles/homeStyles', () => ({
+  homeStyles: {
+    container: {},
+    content: {},
+    header: {},
+    title: {},
+    subtitle: {},
+    section: {},
+    sectionTitle: {},
+    description: {},
+    bulletList: {},
+    bulletItem: {},
+    bulletText: {},
+    challengeSection: {},
+    challengeTitle: {},
+    challengeText: {},
+    statsSection: {},
+    statsGrid: {},
+    statCard: {},
+    statNumber: {},
+    statLabel: {},
+    playButton: {},
+    playGradient: {},
+    playText: {},
+    disclaimer: {},
+    disclaimerText: {},
+  },
 }));
 
 describe('HomeScreen', () => {
@@ -19,8 +50,8 @@ describe('HomeScreen', () => {
     render(<HomeScreen />);
     
     // Test the actual text that exists in your component
-    expect(screen.getByText('Market Timer')).toBeTruthy();
-    expect(screen.getByText('Can you beat the market?')).toBeTruthy();
+    expect(screen.getByText('Ticker Timer')).toBeTruthy();
+    expect(screen.getByText('A game that sees if you can beat the market by timing it')).toBeTruthy();
     expect(screen.getByText('🎯 Your Mission')).toBeTruthy();
     expect(screen.getByText('Start the Challenge')).toBeTruthy();
   });
@@ -33,7 +64,7 @@ describe('HomeScreen', () => {
     expect(startButton).toBeTruthy();
   });
 
-    test('finds elements using getByLabelText query method', () => {
+  test('finds elements using getByLabelText query method', () => {
     render(<HomeScreen />);
 
     // Test using getByLabelText query method (accessibility labels)
@@ -42,13 +73,13 @@ describe('HomeScreen', () => {
 
     expect(title).toBeTruthy();
     expect(subtitle).toBeTruthy();
-    });
+  });
 
   test('checks for optional elements using queryByText query method', () => {
     render(<HomeScreen />);
     
     // Test using queryByText query method (returns null if not found, doesn't throw)
-    const existingElement = screen.queryByText('Market Timer');
+    const existingElement = screen.queryByText('Ticker Timer');
     const nonExistentElement = screen.queryByText('This text does not exist');
     
     expect(existingElement).toBeTruthy();
@@ -67,11 +98,15 @@ describe('HomeScreen', () => {
     expect(mockPush).toHaveBeenCalledWith('/game');
   });
 
-  test('renders key sections using getByText', () => {
+  test('renders key sections using getByText and findByText', async () => {
     render(<HomeScreen />);
     
-    expect(screen.getByText('🎮 How It Works')).toBeTruthy();
+    expect(screen.getByText('🎮 How to Play')).toBeTruthy();
     expect(screen.getByText('💡 The Challenge')).toBeTruthy();
     expect(screen.getByText('📊 What You\'ll Experience')).toBeTruthy();
+    
+    // Test findByText (async query)
+    const missionSection = await screen.findByText('🎯 Your Mission');
+    expect(missionSection).toBeTruthy();
   });
 });
