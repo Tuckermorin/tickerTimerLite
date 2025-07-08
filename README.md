@@ -2,6 +2,9 @@
 
 Ticker Timer Lite is a React Native game built with the Expo framework. It challenges players to try timing the market over a simulated 30‑year period of S&P 500 data. Each month you decide whether to stay invested or move to cash and see if you can outperform a simple buy‑and‑hold strategy.
 
+## WireFrams
+https://www.figma.com/board/UunpFWt3aMnydAG7T36VbH/Untitled?node-id=0-1&t=0pErmHhtkLGr4dc2-1
+
 ## Features
 - Historical S&P 500 data from 1974–2025 with random 30‑year segments
 - Interactive gameplay with monthly decisions and yearly cash bonuses
