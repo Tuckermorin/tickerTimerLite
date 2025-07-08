@@ -23,6 +23,7 @@ export default function GameScreen() {
   // Player portfolio state
   const [playerCash, setPlayerCash] = useState(0);
   const [playerShares, setPlayerShares] = useState(0);
+  const [buyHoldShares, setBuyHoldShares] = useState(0);
   const [isInvested, setIsInvested] = useState(true); // Start invested
   
   // Current market data
@@ -55,6 +56,7 @@ export default function GameScreen() {
     const startingShares = 10000 / startingPrice;
     
     setPlayerShares(startingShares);
+    setBuyHoldShares(startingShares);
     setPlayerCash(0);
     setIsInvested(true);
     setCurrentPrice(startingPrice);
@@ -73,6 +75,23 @@ export default function GameScreen() {
       setCurrentMonth(prev => {
         const nextMonth = prev + 1;
         
+        // Check if it's a new year (every 12 months) and not the first month
+        const isNewYear = nextMonth > 0 && (nextMonth % 12) === 0;
+
+        if (isNewYear) {
+          if (isInvested) {
+            // If invested, automatically invest the $5000 bonus
+            const bonusShares = 5000 / currentPrice;
+            setPlayerShares(currentShares => currentShares + bonusShares);
+          } else {
+            // If in cash, add $5000 to cash
+            setPlayerCash(currentCash => currentCash + 5000);
+          }
+          
+          // Also add $5000 to buy-and-hold strategy
+          setBuyHoldShares(currentShares => currentShares + (5000 / currentPrice));
+        }
+
         if (nextMonth >= gameData.length) {
           // Game complete
           setIsPlaying(false);
@@ -81,7 +100,22 @@ export default function GameScreen() {
           
           // Navigate to results after a brief delay
           setTimeout(() => {
-            router.push('/results');
+            // Calculate final values
+            const finalPlayerValue = (playerCash + (playerShares * currentPrice));
+            const finalBuyHoldValue = buyHoldShares * currentPrice;
+            const playerReturn = ((finalPlayerValue - 10000) / 10000) * 100;
+            const buyHoldReturn = ((finalBuyHoldValue - 10000) / 10000) * 100;
+
+            router.push({
+              pathname: '/results',
+              params: {
+                playerValue: finalPlayerValue,
+                buyHoldValue: finalBuyHoldValue,
+                playerReturn: playerReturn,
+                buyHoldReturn: buyHoldReturn,
+                didWin: finalPlayerValue > finalBuyHoldValue
+              }
+            });
           }, 2000);
           
           return prev;
@@ -93,6 +127,13 @@ export default function GameScreen() {
         const change = ((newPrice - oldPrice) / oldPrice) * 100;
         
         setCurrentPrice(newPrice);
+
+        // Check for annual bonus display
+        if (nextMonth > 0 && (nextMonth % 12) === 0) {
+          // Optional: You could add a toast notification here later
+          console.log(`💰 Year ${Math.floor(nextMonth / 12) + 1} Bonus: +$5000!`);
+        }
+
         setPreviousPrice(oldPrice);
         setMonthlyChange(change);
         
@@ -153,9 +194,7 @@ export default function GameScreen() {
     : playerCash;
 
   // Calculate buy-and-hold comparison
-  const buyHoldValue = gameData.length > 0 
-    ? (10000 / gameData[0].value) * currentPrice 
-    : 10000;
+  const buyHoldValue = buyHoldShares * currentPrice;
 
   // Format currency
   const formatCurrency = (value) => {

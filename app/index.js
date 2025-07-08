@@ -48,7 +48,7 @@ export default function Welcome() {
             <View style={homeStyles.bulletItem}>
               <Ionicons name="cash" size={20} color="#4facfe" />
               <Text style={homeStyles.bulletText}>
-                Start with $10,000 fully invested in the market
+                Start with $10,000 fully invested in the market. At the start of every year you recieve a bonus of $5,000.
               </Text>
             </View>
             <View style={homeStyles.bulletItem}>
@@ -60,7 +60,7 @@ export default function Welcome() {
             <View style={homeStyles.bulletItem}>
               <Ionicons name="stopwatch" size={20} color="#4facfe" />
               <Text style={homeStyles.bulletText}>
-                Watch 30 years unfold in just 30 seconds (1 second per month)
+                Watch 30 years unfold in just 6 minutes. No, you can't speed it up!
               </Text>
             </View>
             <View style={homeStyles.bulletItem}>
