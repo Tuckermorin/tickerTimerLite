@@ -1,7 +1,7 @@
 // __tests__/index.test.js
 import { render, screen, waitFor } from '@testing-library/react-native';
 import { userEvent } from '@testing-library/react-native';
-import HomeScreen from '../app/index'; // Fixed import path
+import HomeScreen from '../app/index';
 
 // Mock the router
 const mockPush = jest.fn();
@@ -86,7 +86,7 @@ describe('HomeScreen', () => {
     expect(nonExistentElement).toBeNull();
   });
 
-  test('navigates to game screen when start button is pressed using User Event API', async () => {
+  test('navigates to setup screen when start button is pressed using User Event API', async () => {
     const user = userEvent.setup();
     render(<HomeScreen />);
     
@@ -94,8 +94,8 @@ describe('HomeScreen', () => {
     const startButton = screen.getByTestId('start-challenge-button');
     await user.press(startButton);
     
-    // Verify navigation was called
-    expect(mockPush).toHaveBeenCalledWith('/game');
+    // Verify navigation was called to setup instead of game
+    expect(mockPush).toHaveBeenCalledWith('/setup');
   });
 
   test('renders key sections using getByText and findByText', async () => {
@@ -108,5 +108,15 @@ describe('HomeScreen', () => {
     // Test findByText (async query)
     const missionSection = await screen.findByText('🎯 Your Mission');
     expect(missionSection).toBeTruthy();
+  });
+
+  test('displays updated game duration and stats', () => {
+    render(<HomeScreen />);
+    
+    // Check for updated 20-year content instead of 30-year
+    expect(screen.getByText(/20 years/)).toBeTruthy();
+    expect(screen.getByText('20')).toBeTruthy(); // Years stat
+    expect(screen.getByText('240')).toBeTruthy(); // Decisions stat
+    expect(screen.getByText('~500%')).toBeTruthy(); // Market growth stat
   });
 });

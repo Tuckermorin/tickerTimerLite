@@ -1,5 +1,5 @@
 // app/_layout.js
-// Root layout with simple stack navigation
+// Root layout with setup screen added to navigation
 
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -29,10 +29,17 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
+          name="setup"
+          options={{
+            title: 'Game Setup',
+            headerBackTitle: 'Home',
+          }}
+        />
+        <Stack.Screen
           name="game"
           options={{
             title: 'Market Timing Game',
-            headerBackTitle: 'Home',
+            headerBackTitle: 'Setup',
           }}
         />
         <Stack.Screen

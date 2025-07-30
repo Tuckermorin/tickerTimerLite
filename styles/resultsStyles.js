@@ -28,6 +28,33 @@ export const resultsStyles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
+  modeSection: {
+    alignItems: 'center',
+    marginBottom: 25,
+  },
+  modeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    gap: 12,
+  },
+  modeText: {
+    flex: 1,
+  },
+  modeTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 2,
+  },
+  modeSubtitle: {
+    fontSize: 14,
+    color: '#8e8e93',
+  },
   resultsSection: {
     marginBottom: 30,
   },

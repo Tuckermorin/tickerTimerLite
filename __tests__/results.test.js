@@ -9,7 +9,10 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: mockPush,
   }),
-  useLocalSearchParams: () => ({}),
+  useLocalSearchParams: () => ({
+    gameMode: 'classic',
+    gameYears: '20'
+  }),
 }));
 
 // Mock the styles
@@ -20,6 +23,11 @@ jest.mock('../styles/resultsStyles', () => ({
     header: {},
     title: {},
     subtitle: {},
+    modeSection: {},
+    modeCard: {},
+    modeText: {},
+    modeTitle: {},
+    modeSubtitle: {},
     resultsSection: {},
     sectionTitle: {},
     resultCard: {},
@@ -68,7 +76,16 @@ describe('ResultsScreen', () => {
     expect(screen.getByText('Play Again')).toBeTruthy();
   });
 
-  test('navigates to game when play again is pressed using User Event API', async () => {
+  test('displays classic mode completion info', async () => {
+    render(<ResultsScreen />);
+    
+    await waitFor(() => {
+      expect(screen.getByText('Classic Challenge Complete!')).toBeTruthy();
+      expect(screen.getByText(/20 years with S&P 500/)).toBeTruthy();
+    });
+  });
+
+  test('navigates to setup when play again is pressed using User Event API', async () => {
     const user = userEvent.setup();
     render(<ResultsScreen />);
     
@@ -80,8 +97,8 @@ describe('ResultsScreen', () => {
     const playAgainButton = screen.getByText('Play Again');
     await user.press(playAgainButton);
     
-    // Verify navigation was called
-    expect(mockPush).toHaveBeenCalledWith('/game');
+    // Verify navigation was called to setup instead of game
+    expect(mockPush).toHaveBeenCalledWith('/setup');
   });
 
   test('navigates home when home button is pressed using User Event API', async () => {
@@ -127,8 +144,44 @@ describe('ResultsScreen', () => {
     expect(factText).toBeTruthy();
   });
 
+  test('displays correct year count', async () => {
+    render(<ResultsScreen />);
+    
+    await waitFor(() => {
+      // Should show 20 years instead of 30
+      expect(screen.getByText(/20 years/)).toBeTruthy();
+    });
+  });
+
   test('component renders without crashing', () => {
     render(<ResultsScreen />);
     expect(true).toBe(true);
+  });
+});
+
+// Test with different mode parameters
+describe('ResultsScreen with Speed Run Mode', () => {
+  beforeEach(() => {
+    mockPush.mockClear();
+    
+    // Mock speed run mode parameters
+    jest.doMock('expo-router', () => ({
+      useRouter: () => ({
+        push: mockPush,
+      }),
+      useLocalSearchParams: () => ({
+        gameMode: 'speedrun',
+        gameYears: '10'
+      }),
+    }));
+  });
+
+  test('displays speed run completion info', async () => {
+    render(<ResultsScreen />);
+    
+    await waitFor(() => {
+      expect(screen.getByText('Speed Run Complete!')).toBeTruthy();
+      expect(screen.getByText(/10 years at 2x speed/)).toBeTruthy();
+    });
   });
 });

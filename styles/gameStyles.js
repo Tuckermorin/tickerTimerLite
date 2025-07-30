@@ -44,6 +44,19 @@ export const gameStyles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#4facfe',
   },
+  modeSection: {
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  modeText: {
+    fontSize: 14,
+    color: '#8e8e93',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
   marketSection: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
@@ -69,6 +82,53 @@ export const gameStyles = StyleSheet.create({
   marketChange: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  stocksSection: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  stocksGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  stockCard: {
+    flex: 1,
+    minWidth: '48%',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  stockHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  stockSymbol: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#4facfe',
+  },
+  stockChange: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  stockPrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  stockName: {
+    fontSize: 10,
+    color: '#8e8e93',
   },
   portfolioSection: {
     backgroundColor: 'rgba(255,255,255,0.05)',
@@ -136,6 +196,34 @@ export const gameStyles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  diversifiedNotice: {
+    backgroundColor: 'rgba(79, 172, 254, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 172, 254, 0.3)',
+  },
+  noticeText: {
+    fontSize: 14,
+    color: '#4facfe',
+    textAlign: 'center',
+  },
+  eventCounter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(79, 172, 254, 0.1)',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 15,
+    gap: 8,
+  },
+  eventCounterText: {
+    fontSize: 12,
+    color: '#4facfe',
+    fontWeight: '600',
   },
   controlSection: {
     flexDirection: 'row',

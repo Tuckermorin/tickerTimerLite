@@ -1,35 +1,178 @@
 // app/game.js
-// Main game screen with monthly S&P 500 cycling
+// Main game screen with React Native Animated API integration
 
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, Alert } from 'react-native';
+import { View, Text, Pressable, ScrollView, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { gameStyles } from '../styles/gameStyles';
 import { getRandomPeriod } from '../utils/fullHistoricalData';
+import { getRandomMultiStockPeriod, stockMetadata, getStockColor } from '../utils/stockData';
+import { createEventEngine, formatEventForDisplay } from '../utils/eventEngine';
+import NewsFlash from '../components/NewsFlash';
+import CustomModal from '../components/CustomModal';
 
 export default function GameScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const intervalRef = useRef(null);
+  const eventEngineRef = useRef(null);
+  
+  // Animation refs
+  const priceAnimations = useRef({});
+  const portfolioValueAnim = useRef(new Animated.Value(0)).current;
+  const buyHoldValueAnim = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const buttonScaleAnim = useRef(new Animated.Value(1)).current;
+  
+  // Get game parameters from setup
+  const gameMode = params.mode || 'classic';
+  const hasEconomicEvents = params.economicEvents === 'true';
+  const hasNewsFlashes = params.newsFlashes === 'true';
+  
+  // Calculate game length based on mode
+  const gameLength = gameMode === 'speedrun' ? 120 : 240; // 10 or 20 years in months
+  const gameYears = gameMode === 'speedrun' ? 10 : 20;
+  const gameSpeed = gameMode === 'speedrun' ? 500 : 1000; // milliseconds per month
   
   // Game state
-  const [gameData, setGameData] = useState([]);
+  const [gameData, setGameData] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [gameComplete, setGameComplete] = useState(false);
   
-  // Player portfolio state
+  // Economic events state
+  const [currentEvent, setCurrentEvent] = useState(null);
+  const [showNewsFlash, setShowNewsFlash] = useState(false);
+  const [eventHistory, setEventHistory] = useState([]);
+  
+  // Modal state
+  const [showExitModal, setShowExitModal] = useState(false);
+  
+  // Portfolio state for diversified mode
+  const [portfolio, setPortfolio] = useState({
+    SP500: { shares: 0, cash: 0 },
+    AAPL: { shares: 0, cash: 0 },
+    JPM: { shares: 0, cash: 0 },
+    TGT: { shares: 0, cash: 0 },
+    UNH: { shares: 0, cash: 0 }
+  });
+  
+  // Buy-and-hold reference portfolio
+  const [buyHoldPortfolio, setBuyHoldPortfolio] = useState({
+    SP500: { shares: 0 },
+    AAPL: { shares: 0 },
+    JPM: { shares: 0 },
+    TGT: { shares: 0 },
+    UNH: { shares: 0 }
+  });
+  
+  // Classic mode state (backwards compatibility)
   const [playerCash, setPlayerCash] = useState(0);
   const [playerShares, setPlayerShares] = useState(0);
   const [buyHoldShares, setBuyHoldShares] = useState(0);
-  const [isInvested, setIsInvested] = useState(true); // Start invested
+  const [isInvested, setIsInvested] = useState(true);
   
   // Current market data
-  const [currentPrice, setCurrentPrice] = useState(0);
-  const [previousPrice, setPreviousPrice] = useState(0);
-  const [monthlyChange, setMonthlyChange] = useState(0);
+  const [currentPrices, setCurrentPrices] = useState({});
+  const [previousPrices, setPreviousPrices] = useState({});
+  const [monthlyChanges, setMonthlyChanges] = useState({});
+
+  // Initialize price animations
+  useEffect(() => {
+    const symbols = gameMode === 'diversified' ? Object.keys(stockMetadata) : ['SP500'];
+    symbols.forEach(symbol => {
+      priceAnimations.current[symbol] = new Animated.Value(0);
+    });
+  }, [gameMode]);
+
+  // Animate portfolio values when they change
+  useEffect(() => {
+    const currentValue = getCurrentPortfolioValue();
+    const buyHoldValue = getBuyHoldValue();
+    
+    animatePortfolioValue(portfolioValueAnim, currentValue);
+    animatePortfolioValue(buyHoldValueAnim, buyHoldValue);
+  }, [currentPrices, portfolio, buyHoldPortfolio, playerCash, playerShares]);
+
+  // Animate progress bar
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: currentMonth / gameLength,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [currentMonth, gameLength]);
+
+  // Pulse animation for when game is playing
+  useEffect(() => {
+    if (isPlaying) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.05,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    }
+  }, [isPlaying]);
+
+  const animatePortfolioValue = (animatedValue, targetValue) => {
+    Animated.spring(animatedValue, {
+      toValue: targetValue,
+      tension: 100,
+      friction: 8,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const animatePriceChange = (symbol, newPrice, oldPrice) => {
+    const change = newPrice - oldPrice;
+    const direction = change >= 0 ? 1 : -1;
+    
+    Animated.sequence([
+      Animated.timing(priceAnimations.current[symbol], {
+        toValue: direction * 0.1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.spring(priceAnimations.current[symbol], {
+        toValue: 0,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const animateButtonPress = (callback) => {
+    Animated.sequence([
+      Animated.timing(buttonScaleAnim, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(buttonScaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      if (callback) callback();
+    });
+  };
 
   // Initialize game data on component mount
   useEffect(() => {
@@ -46,113 +189,244 @@ export default function GameScreen() {
   }, []);
 
   const initializeGame = () => {
-    // Get random 30-year period (360 months)
-    const selectedData = getRandomPeriod();
+    if (gameMode === 'diversified') {
+      // Get multi-stock data
+      const selectedData = getRandomMultiStockPeriod(gameMode);
+      setGameData(selectedData);
+      
+      // Initialize event engine
+      eventEngineRef.current = createEventEngine(selectedData, gameMode, hasEconomicEvents);
+      
+      // Initialize diversified portfolio - equal allocation across 5 stocks
+      const initialAllocation = 10000 / 5; // $2000 per stock
+      const initialPortfolio = {};
+      const initialBuyHold = {};
+      const initialPrices = {};
+      
+      Object.keys(selectedData).forEach(symbol => {
+        const startingPrice = selectedData[symbol][0].value;
+        const shares = initialAllocation / startingPrice;
+        
+        initialPortfolio[symbol] = { shares, cash: 0 };
+        initialBuyHold[symbol] = { shares };
+        initialPrices[symbol] = startingPrice;
+      });
+      
+      setPortfolio(initialPortfolio);
+      setBuyHoldPortfolio(initialBuyHold);
+      setCurrentPrices(initialPrices);
+      setPreviousPrices(initialPrices);
+      
+    } else {
+      // Classic mode - single stock (S&P 500)
+      const selectedData = getRandomPeriod(gameMode);
+      setGameData(selectedData);
+      
+      // Initialize event engine
+      eventEngineRef.current = createEventEngine(selectedData, gameMode, hasEconomicEvents);
+      
+      const startingPrice = selectedData[0].value;
+      const startingShares = 10000 / startingPrice;
+      
+      setPlayerShares(startingShares);
+      setBuyHoldShares(startingShares);
+      setPlayerCash(0);
+      setIsInvested(true);
+      setCurrentPrices({ SP500: startingPrice });
+      setPreviousPrices({ SP500: startingPrice });
+    }
     
-    setGameData(selectedData);
-    
-    // Initialize player portfolio
-    const startingPrice = selectedData[0].value;
-    const startingShares = 10000 / startingPrice;
-    
-    setPlayerShares(startingShares);
-    setBuyHoldShares(startingShares);
-    setPlayerCash(0);
-    setIsInvested(true);
-    setCurrentPrice(startingPrice);
-    setPreviousPrice(startingPrice);
     setCurrentMonth(0);
     setGameComplete(false);
+    setEventHistory([]);
   };
 
-  const startGame = () => {
-    if (gameData.length === 0) return;
+  const checkForEconomicEvents = (month) => {
+    if (!eventEngineRef.current) return;
     
-    setIsPlaying(true);
-    setIsPaused(false);
-    
-    intervalRef.current = setInterval(() => {
-      setCurrentMonth(prev => {
-        const nextMonth = prev + 1;
-        
-        // Check if it's a new year (every 12 months) and not the first month
-        const isNewYear = nextMonth > 0 && (nextMonth % 12) === 0;
-
-        if (isNewYear) {
-          if (isInvested) {
-            // If invested, automatically invest the $5000 bonus
-            const bonusShares = 5000 / currentPrice;
-            setPlayerShares(currentShares => currentShares + bonusShares);
-          } else {
-            // If in cash, add $5000 to cash
-            setPlayerCash(currentCash => currentCash + 5000);
-          }
-          
-          // Also add $5000 to buy-and-hold strategy
-          setBuyHoldShares(currentShares => currentShares + (5000 / currentPrice));
-        }
-
-        if (nextMonth >= gameData.length) {
-          // Game complete
-          setIsPlaying(false);
-          setGameComplete(true);
-          clearInterval(intervalRef.current);
-          
-          // Navigate to results after a brief delay
-          setTimeout(() => {
-            // Calculate final values
-            const finalPlayerValue = (playerCash + (playerShares * currentPrice));
-            const finalBuyHoldValue = buyHoldShares * currentPrice;
-            const playerReturn = ((finalPlayerValue - 10000) / 10000) * 100;
-            const buyHoldReturn = ((finalBuyHoldValue - 10000) / 10000) * 100;
-
-            router.push({
-              pathname: '/results',
-              params: {
-                playerValue: finalPlayerValue,
-                buyHoldValue: finalBuyHoldValue,
-                playerReturn: playerReturn,
-                buyHoldReturn: buyHoldReturn,
-                didWin: finalPlayerValue > finalBuyHoldValue
-              }
-            });
-          }, 2000);
-          
-          return prev;
-        }
-        
-        // Update market data
-        const newPrice = gameData[nextMonth].value;
-        const oldPrice = gameData[nextMonth - 1].value;
-        const change = ((newPrice - oldPrice) / oldPrice) * 100;
-        
-        setCurrentPrice(newPrice);
-
-        // Check for annual bonus display
-        if (nextMonth > 0 && (nextMonth % 12) === 0) {
-          // Optional: You could add a toast notification here later
-          console.log(`💰 Year ${Math.floor(nextMonth / 12) + 1} Bonus: +$5000!`);
-        }
-
-        setPreviousPrice(oldPrice);
-        setMonthlyChange(change);
-        
-        return nextMonth;
-      });
-    }, 1000); // 1 second per month
-  };
-
-  const pauseGame = () => {
-    setIsPaused(true);
-    setIsPlaying(false);
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
+    const event = eventEngineRef.current.checkForEvents(month);
+    if (event && hasNewsFlashes) {
+      const formattedEvent = formatEventForDisplay(event);
+      setCurrentEvent(formattedEvent);
+      setShowNewsFlash(true);
+      
+      // Add to event history
+      setEventHistory(prev => [...prev, formattedEvent]);
     }
   };
 
+  const dismissNewsFlash = () => {
+    setShowNewsFlash(false);
+    setCurrentEvent(null);
+  };
+
+  const startGame = () => {
+    if (!gameData) return;
+    
+    animateButtonPress(() => {
+      setIsPlaying(true);
+      setIsPaused(false);
+      
+      intervalRef.current = setInterval(() => {
+        setCurrentMonth(prev => {
+          const nextMonth = prev + 1;
+          
+          // Check for economic events
+          checkForEconomicEvents(nextMonth);
+          
+          // Check if it's a new year (every 12 months) and not the first month
+          const isNewYear = nextMonth > 0 && (nextMonth % 12) === 0;
+
+          if (isNewYear) {
+            // Add $5000 annual bonus
+            if (gameMode === 'diversified') {
+              // Distribute $1000 to each of 5 stocks
+              setPortfolio(currentPortfolio => {
+                const updatedPortfolio = { ...currentPortfolio };
+                Object.keys(updatedPortfolio).forEach(symbol => {
+                  const currentPrice = currentPrices[symbol];
+                  const bonusShares = 1000 / currentPrice;
+                  updatedPortfolio[symbol] = {
+                    ...updatedPortfolio[symbol],
+                    shares: updatedPortfolio[symbol].shares + bonusShares
+                  };
+                });
+                return updatedPortfolio;
+              });
+              
+              setBuyHoldPortfolio(currentBuyHold => {
+                const updatedBuyHold = { ...currentBuyHold };
+                Object.keys(updatedBuyHold).forEach(symbol => {
+                  const currentPrice = currentPrices[symbol];
+                  const bonusShares = 1000 / currentPrice;
+                  updatedBuyHold[symbol] = {
+                    shares: updatedBuyHold[symbol].shares + bonusShares
+                  };
+                });
+                return updatedBuyHold;
+              });
+              
+            } else {
+              // Classic mode
+              if (isInvested) {
+                const bonusShares = 5000 / currentPrices.SP500;
+                setPlayerShares(currentShares => currentShares + bonusShares);
+              } else {
+                setPlayerCash(currentCash => currentCash + 5000);
+              }
+              setBuyHoldShares(currentShares => currentShares + (5000 / currentPrices.SP500));
+            }
+          }
+
+          if (nextMonth >= (gameMode === 'diversified' ? gameData.SP500.length : gameData.length)) {
+            // Game complete
+            setIsPlaying(false);
+            setGameComplete(true);
+            clearInterval(intervalRef.current);
+            
+            // Navigate to results after a brief delay
+            setTimeout(() => {
+              navigateToResults();
+            }, 2000);
+            
+            return prev;
+          }
+          
+          // Update market data with animations
+          if (gameMode === 'diversified') {
+            const newPrices = {};
+            const newChanges = {};
+            
+            Object.keys(gameData).forEach(symbol => {
+              const newPrice = gameData[symbol][nextMonth].value;
+              const oldPrice = gameData[symbol][nextMonth - 1].value;
+              const change = ((newPrice - oldPrice) / oldPrice) * 100;
+              
+              newPrices[symbol] = newPrice;
+              newChanges[symbol] = change;
+              
+              // Animate price change
+              animatePriceChange(symbol, newPrice, oldPrice);
+            });
+            
+            setCurrentPrices(newPrices);
+            setPreviousPrices(prev => ({ ...prev, ...Object.fromEntries(
+              Object.keys(gameData).map(symbol => [symbol, gameData[symbol][nextMonth - 1].value])
+            )}));
+            setMonthlyChanges(newChanges);
+            
+          } else {
+            // Classic mode
+            const newPrice = gameData[nextMonth].value;
+            const oldPrice = gameData[nextMonth - 1].value;
+            const change = ((newPrice - oldPrice) / oldPrice) * 100;
+            
+            // Animate price change
+            animatePriceChange('SP500', newPrice, oldPrice);
+            
+            setCurrentPrices({ SP500: newPrice });
+            setPreviousPrices({ SP500: oldPrice });
+            setMonthlyChanges({ SP500: change });
+          }
+          
+          return nextMonth;
+        });
+      }, gameSpeed);
+    });
+  };
+
+  const navigateToResults = () => {
+    let finalPlayerValue, finalBuyHoldValue;
+    
+    if (gameMode === 'diversified') {
+      // Calculate total portfolio values
+      finalPlayerValue = Object.keys(portfolio).reduce((total, symbol) => {
+        return total + (portfolio[symbol].shares * currentPrices[symbol]) + portfolio[symbol].cash;
+      }, 0);
+      
+      finalBuyHoldValue = Object.keys(buyHoldPortfolio).reduce((total, symbol) => {
+        return total + (buyHoldPortfolio[symbol].shares * currentPrices[symbol]);
+      }, 0);
+      
+    } else {
+      // Classic mode
+      finalPlayerValue = (playerCash + (playerShares * currentPrices.SP500));
+      finalBuyHoldValue = buyHoldShares * currentPrices.SP500;
+    }
+    
+    const playerReturn = ((finalPlayerValue - 10000) / 10000) * 100;
+    const buyHoldReturn = ((finalBuyHoldValue - 10000) / 10000) * 100;
+
+    router.push({
+      pathname: '/results',
+      params: {
+        playerValue: finalPlayerValue,
+        buyHoldValue: finalBuyHoldValue,
+        playerReturn: playerReturn,
+        buyHoldReturn: buyHoldReturn,
+        didWin: finalPlayerValue > finalBuyHoldValue,
+        gameMode: gameMode,
+        gameYears: gameYears,
+        eventsTriggered: eventHistory.length
+      }
+    });
+  };
+
+  const pauseGame = () => {
+    animateButtonPress(() => {
+      setIsPaused(true);
+      setIsPlaying(false);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    });
+  };
+
   const resumeGame = () => {
-    setIsPaused(false);
-    startGame();
+    animateButtonPress(() => {
+      setIsPaused(false);
+      startGame();
+    });
   };
 
   const goToMenu = () => {
@@ -160,43 +434,59 @@ export default function GameScreen() {
       clearInterval(intervalRef.current);
     }
     
-    Alert.alert(
-      "Return to Menu",
-      "Are you sure? Your current game will be lost.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Yes", onPress: () => router.push('/') }
-      ]
-    );
+    setShowExitModal(true);
   };
 
+  // Classic mode buy/sell functions with animations
   const buyAll = () => {
-    if (!isInvested && playerCash > 0) {
-      const sharesCanBuy = playerCash / currentPrice;
-      setPlayerShares(sharesCanBuy);
-      setPlayerCash(0);
-      setIsInvested(true);
-    }
+    if (gameMode !== 'classic') return;
+    
+    animateButtonPress(() => {
+      if (!isInvested && playerCash > 0) {
+        const sharesCanBuy = playerCash / currentPrices.SP500;
+        setPlayerShares(sharesCanBuy);
+        setPlayerCash(0);
+        setIsInvested(true);
+      }
+    });
   };
 
   const sellAll = () => {
-    if (isInvested && playerShares > 0) {
-      const cashFromSale = playerShares * currentPrice;
-      setPlayerCash(cashFromSale);
-      setPlayerShares(0);
-      setIsInvested(false);
-    }
+    if (gameMode !== 'classic') return;
+    
+    animateButtonPress(() => {
+      if (isInvested && playerShares > 0) {
+        const cashFromSale = playerShares * currentPrices.SP500;
+        setPlayerCash(cashFromSale);
+        setPlayerShares(0);
+        setIsInvested(false);
+      }
+    });
   };
 
   // Calculate current portfolio value
-  const currentPortfolioValue = isInvested 
-    ? playerShares * currentPrice 
-    : playerCash;
+  const getCurrentPortfolioValue = () => {
+    if (gameMode === 'diversified') {
+      return Object.keys(portfolio).reduce((total, symbol) => {
+        return total + (portfolio[symbol].shares * currentPrices[symbol]) + portfolio[symbol].cash;
+      }, 0);
+    } else {
+      return isInvested ? playerShares * currentPrices.SP500 : playerCash;
+    }
+  };
 
   // Calculate buy-and-hold comparison
-  const buyHoldValue = buyHoldShares * currentPrice;
+  const getBuyHoldValue = () => {
+    if (gameMode === 'diversified') {
+      return Object.keys(buyHoldPortfolio).reduce((total, symbol) => {
+        return total + (buyHoldPortfolio[symbol].shares * currentPrices[symbol]);
+      }, 0);
+    } else {
+      return buyHoldShares * currentPrices.SP500;
+    }
+  };
 
-  // Format currency
+  // Format currency with animation
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -212,133 +502,211 @@ export default function GameScreen() {
     return `${sign}${value.toFixed(2)}%`;
   };
 
-  if (gameData.length === 0) {
+  if (!gameData) {
     return (
       <LinearGradient colors={['#1a1a2e', '#16213e']} style={gameStyles.container}>
-        <View style={gameStyles.loadingContainer}>
+        <Animated.View style={[gameStyles.loadingContainer, {
+          transform: [{ scale: pulseAnim }]
+        }]}>
           <Text style={gameStyles.loadingText}>Loading game data...</Text>
-        </View>
+        </Animated.View>
       </LinearGradient>
     );
   }
 
   return (
     <LinearGradient colors={['#1a1a2e', '#16213e']} style={gameStyles.container}>
-      <View style={gameStyles.content}>
+      <ScrollView style={gameStyles.content} showsVerticalScrollIndicator={false}>
         
         {/* Game Progress */}
         <View style={gameStyles.progressSection}>
-          <Text style={gameStyles.progressTitle}>
-            Year {Math.floor(currentMonth / 12) + 1} of 30
-          </Text>
+          <Animated.Text style={[gameStyles.progressTitle, {
+            transform: [{ scale: isPlaying ? pulseAnim : 1 }]
+          }]}>
+            Year {Math.floor(currentMonth / 12) + 1} of {gameYears}
+          </Animated.Text>
           <Text style={gameStyles.progressSubtitle}>
-            Month {(currentMonth % 12) + 1} • {gameData[currentMonth]?.date}
+            Month {(currentMonth % 12) + 1} • {gameMode === 'diversified' ? gameData.SP500[currentMonth]?.date : gameData[currentMonth]?.date}
+            {gameMode === 'speedrun' && ' • 2x Speed'}
           </Text>
           <View style={gameStyles.progressBar}>
-            <View 
+            <Animated.View 
               style={[
                 gameStyles.progressFill, 
-                { width: `${(currentMonth / 360) * 100}%` }
+                { 
+                  width: progressAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0%', '100%']
+                  })
+                }
               ]} 
             />
           </View>
         </View>
 
-        {/* Market Data */}
-        <View style={gameStyles.marketSection}>
-          <Text style={gameStyles.sectionTitle}>S&P 500</Text>
-          <Text style={gameStyles.marketPrice}>{formatCurrency(currentPrice)}</Text>
-          <Text style={[
-            gameStyles.marketChange,
-            { color: monthlyChange >= 0 ? '#38ef7d' : '#ff6b6b' }
-          ]}>
-            {formatPercentage(monthlyChange)} this month
+        {/* Game Mode Badge */}
+        <View style={gameStyles.modeSection}>
+          <Text style={gameStyles.modeText}>
+            {gameMode === 'classic' && '📈 Classic Mode'}
+            {gameMode === 'diversified' && '📊 Diversified Mode'}
+            {gameMode === 'speedrun' && '⚡ Speed Run Mode'}
+            {hasEconomicEvents && ' • Economic Events'}
           </Text>
         </View>
 
-        {/* Player Portfolio */}
+        {/* Event History Counter */}
+        {hasEconomicEvents && eventHistory.length > 0 && (
+          <Animated.View style={[gameStyles.eventCounter, {
+            transform: [{ scale: pulseAnim }]
+          }]}>
+            <Ionicons name="newspaper" size={16} color="#4facfe" />
+            <Text style={gameStyles.eventCounterText}>
+              {eventHistory.length} economic event{eventHistory.length !== 1 ? 's' : ''} occurred
+            </Text>
+          </Animated.View>
+        )}
+
+        {/* Market Data */}
+        {gameMode === 'diversified' ? (
+          <View style={gameStyles.stocksSection}>
+            <Text style={gameStyles.sectionTitle}>Market Prices</Text>
+            <View style={gameStyles.stocksGrid}>
+              {Object.keys(stockMetadata).map(symbol => (
+                <Animated.View 
+                  key={symbol} 
+                  style={[gameStyles.stockCard, {
+                    transform: priceAnimations.current[symbol] ? [{
+                      translateY: priceAnimations.current[symbol].interpolate({
+                        inputRange: [-0.1, 0, 0.1],
+                        outputRange: [5, 0, -5]
+                      })
+                    }] : []
+                  }]}
+                >
+                  <View style={gameStyles.stockHeader}>
+                    <Text style={gameStyles.stockSymbol}>{symbol}</Text>
+                    <Text style={[
+                      gameStyles.stockChange,
+                      { color: (monthlyChanges[symbol] || 0) >= 0 ? '#38ef7d' : '#ff6b6b' }
+                    ]}>
+                      {formatPercentage(monthlyChanges[symbol] || 0)}
+                    </Text>
+                  </View>
+                  <Text style={gameStyles.stockPrice}>
+                    {formatCurrency(currentPrices[symbol] || 0)}
+                  </Text>
+                  <Text style={gameStyles.stockName}>
+                    {stockMetadata[symbol].name}
+                  </Text>
+                </Animated.View>
+              ))}
+            </View>
+          </View>
+        ) : (
+          <Animated.View style={[gameStyles.marketSection, {
+            transform: priceAnimations.current.SP500 ? [{
+              translateY: priceAnimations.current.SP500.interpolate({
+                inputRange: [-0.1, 0, 0.1],
+                outputRange: [5, 0, -5]
+              })
+            }] : []
+          }]}>
+            <Text style={gameStyles.sectionTitle}>S&P 500</Text>
+            <Text style={gameStyles.marketPrice}>{formatCurrency(currentPrices.SP500 || 0)}</Text>
+            <Text style={[
+              gameStyles.marketChange,
+              { color: (monthlyChanges.SP500 || 0) >= 0 ? '#38ef7d' : '#ff6b6b' }
+            ]}>
+              {formatPercentage(monthlyChanges.SP500 || 0)} this month
+            </Text>
+          </Animated.View>
+        )}
+
+        {/* Portfolio Summary */}
         <View style={gameStyles.portfolioSection}>
           <Text style={gameStyles.sectionTitle}>Your Portfolio</Text>
           
           <View style={gameStyles.portfolioGrid}>
             <View style={gameStyles.portfolioCard}>
               <Text style={gameStyles.portfolioLabel}>Current Value</Text>
-              <Text style={gameStyles.portfolioValue}>
-                {formatCurrency(currentPortfolioValue)}
-              </Text>
+              <Animated.Text style={gameStyles.portfolioValue}>
+                {formatCurrency(getCurrentPortfolioValue())}
+              </Animated.Text>
             </View>
             
             <View style={gameStyles.portfolioCard}>
-              <Text style={gameStyles.portfolioLabel}>Position</Text>
-              <Text style={[
-                gameStyles.portfolioPosition,
-                { color: isInvested ? '#38ef7d' : '#4facfe' }
-              ]}>
-                {isInvested ? 'INVESTED' : 'CASH'}
-              </Text>
+              <Text style={gameStyles.portfolioLabel}>vs Buy & Hold</Text>
+              <Animated.Text style={gameStyles.portfolioValue}>
+                {formatCurrency(getBuyHoldValue())}
+              </Animated.Text>
             </View>
-          </View>
-
-          <View style={gameStyles.portfolioDetails}>
-            <Text style={gameStyles.portfolioDetail}>
-              Cash: {formatCurrency(playerCash)}
-            </Text>
-            <Text style={gameStyles.portfolioDetail}>
-              Shares: {playerShares.toFixed(4)}
-            </Text>
-            <Text style={gameStyles.portfolioDetail}>
-              vs Buy & Hold: {formatCurrency(buyHoldValue)}
-            </Text>
           </View>
         </View>
 
-        {/* Action Buttons */}
-        {isPlaying && (
+        {/* Action Buttons - Classic Mode Only */}
+        {isPlaying && gameMode === 'classic' && (
           <View style={gameStyles.actionSection}>
-            <Pressable 
-              style={[
-                gameStyles.actionButton, 
-                gameStyles.buyButton,
-                { opacity: isInvested ? 0.5 : 1 }
-              ]}
-              onPress={buyAll}
-              disabled={isInvested}
-            >
-              <Ionicons name="trending-up" size={20} color="#fff" />
-              <Text style={gameStyles.actionButtonText}>BUY ALL</Text>
-            </Pressable>
+            <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
+              <Pressable 
+                style={[
+                  gameStyles.actionButton, 
+                  gameStyles.buyButton,
+                  { opacity: isInvested ? 0.5 : 1 }
+                ]}
+                onPress={buyAll}
+                disabled={isInvested}
+              >
+                <Ionicons name="trending-up" size={20} color="#fff" />
+                <Text style={gameStyles.actionButtonText}>BUY ALL</Text>
+              </Pressable>
+            </Animated.View>
             
-            <Pressable 
-              style={[
-                gameStyles.actionButton, 
-                gameStyles.sellButton,
-                { opacity: !isInvested ? 0.5 : 1 }
-              ]}
-              onPress={sellAll}
-              disabled={!isInvested}
-            >
-              <Ionicons name="trending-down" size={20} color="#fff" />
-              <Text style={gameStyles.actionButtonText}>SELL ALL</Text>
-            </Pressable>
+            <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
+              <Pressable 
+                style={[
+                  gameStyles.actionButton, 
+                  gameStyles.sellButton,
+                  { opacity: !isInvested ? 0.5 : 1 }
+                ]}
+                onPress={sellAll}
+                disabled={!isInvested}
+              >
+                <Ionicons name="trending-down" size={20} color="#fff" />
+                <Text style={gameStyles.actionButtonText}>SELL ALL</Text>
+              </Pressable>
+            </Animated.View>
+          </View>
+        )}
+
+        {/* Diversified Mode Notice */}
+        {gameMode === 'diversified' && (
+          <View style={gameStyles.diversifiedNotice}>
+            <Text style={gameStyles.noticeText}>
+              📊 Diversified mode: Your portfolio is automatically rebalanced across 5 stocks
+            </Text>
           </View>
         )}
 
         {/* Game Controls */}
         <View style={gameStyles.controlSection}>
           {!isPlaying && !gameComplete && (
-            <Pressable style={gameStyles.controlButton} onPress={startGame}>
-              <Ionicons name="play" size={20} color="#fff" />
-              <Text style={gameStyles.controlButtonText}>
-                {isPaused ? 'Resume' : 'Start Game'}
-              </Text>
-            </Pressable>
+            <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
+              <Pressable style={gameStyles.controlButton} onPress={startGame}>
+                <Ionicons name="play" size={20} color="#fff" />
+                <Text style={gameStyles.controlButtonText}>
+                  {isPaused ? 'Resume' : 'Start Game'}
+                </Text>
+              </Pressable>
+            </Animated.View>
           )}
           
           {isPlaying && (
-            <Pressable style={gameStyles.controlButton} onPress={pauseGame}>
-              <Ionicons name="pause" size={20} color="#fff" />
-              <Text style={gameStyles.controlButtonText}>Pause</Text>
-            </Pressable>
+            <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
+              <Pressable style={gameStyles.controlButton} onPress={pauseGame}>
+                <Ionicons name="pause" size={20} color="#fff" />
+                <Text style={gameStyles.controlButtonText}>Pause</Text>
+              </Pressable>
+            </Animated.View>
           )}
           
           <Pressable style={gameStyles.menuButton} onPress={goToMenu}>
@@ -348,15 +716,45 @@ export default function GameScreen() {
         </View>
 
         {gameComplete && (
-          <View style={gameStyles.completeSection}>
+          <Animated.View style={[gameStyles.completeSection, {
+            transform: [{ scale: pulseAnim }]
+          }]}>
             <Text style={gameStyles.completeTitle}>Game Complete!</Text>
             <Text style={gameStyles.completeText}>
               Redirecting to results...
             </Text>
-          </View>
+          </Animated.View>
         )}
 
-      </View>
+      </ScrollView>
+      
+      {/* Custom Modal */}
+      <CustomModal
+        visible={showExitModal}
+        type="warning"
+        title="Return to Menu?"
+        message="Are you sure you want to leave? Your current game progress will be lost."
+        buttons={[
+          { 
+            text: "Cancel", 
+            style: "cancel", 
+            onPress: () => setShowExitModal(false) 
+          },
+          { 
+            text: "Yes, Leave Game", 
+            style: "destructive", 
+            onPress: () => router.push('/') 
+          }
+        ]}
+        onDismiss={() => setShowExitModal(false)}
+      />
+      
+      {/* News Flash Overlay */}
+      <NewsFlash 
+        event={currentEvent}
+        visible={showNewsFlash}
+        onDismiss={dismissNewsFlash}
+      />
     </LinearGradient>
   );
 }

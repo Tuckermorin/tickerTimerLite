@@ -1,5 +1,5 @@
 // app/results.js
-// Results screen showing final comparison
+// Results screen showing final comparison with mode support
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
@@ -19,8 +19,9 @@ export default function ResultsScreen() {
     playerReturn: params.playerReturn ? parseFloat(params.playerReturn) : 54.2,
     buyHoldReturn: params.buyHoldReturn ? parseFloat(params.buyHoldReturn) : 87.5,
     didWin: params.didWin === 'true' || false,
+    gameMode: params.gameMode || 'classic',
+    gameYears: params.gameYears ? parseInt(params.gameYears) : 20,
     startingValue: 10000,
-    years: 30,
     trades: 24
   };
   
@@ -45,12 +46,38 @@ export default function ResultsScreen() {
   };
 
   const playAgain = () => {
-    router.push('/game');
+    router.push('/setup');
   };
 
   const goHome = () => {
     router.push('/');
   };
+
+  // Get mode-specific display info
+  const getModeInfo = () => {
+    switch (results.gameMode) {
+      case 'speedrun':
+        return {
+          icon: 'flash',
+          title: 'Speed Run Complete!',
+          subtitle: `${results.gameYears} years at 2x speed`
+        };
+      case 'diversified':
+        return {
+          icon: 'pie-chart',
+          title: 'Diversified Challenge Complete!',
+          subtitle: `${results.gameYears} years with multiple stocks`
+        };
+      default:
+        return {
+          icon: 'trending-up',
+          title: 'Classic Challenge Complete!',
+          subtitle: `${results.gameYears} years with S&P 500`
+        };
+    }
+  };
+
+  const modeInfo = getModeInfo();
 
   return (
     <LinearGradient colors={['#1a1a2e', '#16213e']} style={resultsStyles.container}>
@@ -75,6 +102,17 @@ export default function ResultsScreen() {
             </Text>
           </View>
 
+          {/* Game Mode Info */}
+          <View style={resultsStyles.modeSection}>
+            <View style={resultsStyles.modeCard}>
+              <Ionicons name={modeInfo.icon} size={24} color="#4facfe" />
+              <View style={resultsStyles.modeText}>
+                <Text style={resultsStyles.modeTitle}>{modeInfo.title}</Text>
+                <Text style={resultsStyles.modeSubtitle}>{modeInfo.subtitle}</Text>
+              </View>
+            </View>
+          </View>
+
           {/* Results Comparison */}
           <View style={resultsStyles.resultsSection}>
             <Text style={resultsStyles.sectionTitle}>Final Results</Text>
@@ -97,7 +135,7 @@ export default function ResultsScreen() {
                 {formatPercentage(results.playerReturn)} return
               </Text>
               <Text style={resultsStyles.resultDetail}>
-                {results.trades} trades over {results.years} years
+                {results.trades} trades over {results.gameYears} years
               </Text>
             </View>
 
@@ -119,7 +157,7 @@ export default function ResultsScreen() {
                 {formatPercentage(results.buyHoldReturn)} return
               </Text>
               <Text style={resultsStyles.resultDetail}>
-                Never sold, just held for {results.years} years
+                Never sold, just held for {results.gameYears} years
               </Text>
             </View>
 
@@ -149,7 +187,7 @@ export default function ResultsScreen() {
             <Text style={resultsStyles.sectionTitle}>Game Stats</Text>
             <View style={resultsStyles.statsGrid}>
               <View style={resultsStyles.statItem}>
-                <Text style={resultsStyles.statNumber}>{results.years}</Text>
+                <Text style={resultsStyles.statNumber}>{results.gameYears}</Text>
                 <Text style={resultsStyles.statLabel}>Years</Text>
               </View>
               <View style={resultsStyles.statItem}>
@@ -171,6 +209,8 @@ export default function ResultsScreen() {
                 ? "You're in the minority! Studies show that over 80% of professional fund managers fail to beat the market consistently over long periods."
                 : "You're in good company! Even professional fund managers struggle to beat a simple buy-and-hold strategy over the long term."
               }
+              {results.gameMode === 'speedrun' && " Time pressure makes market timing even harder!"}
+              {results.gameMode === 'diversified' && " Managing multiple stocks adds complexity to timing decisions."}
             </Text>
           </View>
 

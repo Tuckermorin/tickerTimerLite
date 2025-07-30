@@ -9,6 +9,11 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: mockPush,
   }),
+  useLocalSearchParams: () => ({
+    mode: 'classic',
+    economicEvents: 'false',
+    newsFlashes: 'false'
+  }),
 }));
 
 // Mock the styles
@@ -23,6 +28,8 @@ jest.mock('../styles/gameStyles', () => ({
     progressSubtitle: {},
     progressBar: {},
     progressFill: {},
+    modeSection: {},
+    modeText: {},
     marketSection: {},
     sectionTitle: {},
     marketPrice: {},
@@ -72,12 +79,20 @@ describe('GameScreen', () => {
     
     // Wait for game to initialize
     await waitFor(() => {
-      expect(screen.getByText(/Year 1 of 30/)).toBeTruthy();
+      expect(screen.getByText(/Year 1 of 20/)).toBeTruthy(); // Updated for 20 years
     });
     
     expect(screen.getByText('S&P 500')).toBeTruthy();
     expect(screen.getByText('Your Portfolio')).toBeTruthy();
     expect(screen.getByText('Start Game')).toBeTruthy();
+  });
+
+  test('displays classic mode badge', async () => {
+    render(<GameScreen />);
+    
+    await waitFor(() => {
+      expect(screen.getByText('📈 Classic Mode')).toBeTruthy();
+    });
   });
 
   test('finds elements using queryByText method', () => {
@@ -109,8 +124,46 @@ describe('GameScreen', () => {
     });
   });
 
+  test('displays correct year range for classic mode', async () => {
+    render(<GameScreen />);
+    
+    await waitFor(() => {
+      // Should show 20 years instead of 30
+      expect(screen.getByText(/Year 1 of 20/)).toBeTruthy();
+    });
+  });
+
   test('component renders without crashing', () => {
     render(<GameScreen />);
     expect(true).toBe(true);
+  });
+});
+
+// Test with different mode parameters
+describe('GameScreen with Speed Run Mode', () => {
+  beforeEach(() => {
+    mockPush.mockClear();
+    
+    // Mock speed run mode parameters
+    jest.doMock('expo-router', () => ({
+      useRouter: () => ({
+        push: mockPush,
+      }),
+      useLocalSearchParams: () => ({
+        mode: 'speedrun',
+        economicEvents: 'false',
+        newsFlashes: 'false'
+      }),
+    }));
+  });
+
+  test('displays speed run mode elements', async () => {
+    render(<GameScreen />);
+    
+    await waitFor(() => {
+      expect(screen.getByText(/Year 1 of 10/)).toBeTruthy(); // 10 years for speed run
+      expect(screen.getByText('⚡ Speed Run Mode')).toBeTruthy();
+      expect(screen.getByText(/2x Speed/)).toBeTruthy();
+    });
   });
 });
