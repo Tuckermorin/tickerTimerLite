@@ -1,5 +1,5 @@
 // utils/eventEngine.js
-// Logic for triggering economic events during gameplay
+// Simplified event engine for 10 random news flashes per game
 
 import { getRandomEventsForGame } from './economicEvents';
 
@@ -9,7 +9,6 @@ export class EventEngine {
     this.gameMode = gameMode;
     this.hasEconomicEvents = hasEconomicEvents;
     this.events = [];
-    this.currentMonth = 0;
     this.triggeredEvents = new Set();
     
     if (hasEconomicEvents) {
@@ -18,53 +17,25 @@ export class EventEngine {
   }
 
   initializeEvents() {
-    // Get random events for this game period
-    const allEvents = getRandomEventsForGame(this.gameData, this.gameMode);
+    console.log('Initializing event engine with 10 random events...');
     
-    // Map events to specific months in the game
-    this.events = allEvents.map(event => {
-      // Find the corresponding month in the game data
-      const gameDataArray = this.gameMode === 'diversified' ? this.gameData.SP500 : this.gameData;
-      const eventDate = new Date(event.date);
-      
-      // Find the closest month in the game data
-      let closestMonth = 0;
-      let closestDiff = Infinity;
-      
-      gameDataArray.forEach((dataPoint, index) => {
-        const dataDate = new Date(dataPoint.date);
-        const diff = Math.abs(dataDate.getTime() - eventDate.getTime());
-        
-        if (diff < closestDiff) {
-          closestDiff = diff;
-          closestMonth = index;
-        }
-      });
-      
-      // Add some randomness (±2 months) to avoid predictability
-      const randomOffset = Math.floor(Math.random() * 5) - 2; // -2 to +2
-      const finalMonth = Math.max(0, Math.min(
-        gameDataArray.length - 1,
-        closestMonth + randomOffset
-      ));
-      
-      return {
-        ...event,
-        triggerMonth: finalMonth
-      };
+    // Determine game length
+    const gameLength = this.gameMode === 'speedrun' ? 120 : 240; // 10 or 20 years in months
+    
+    // Get exactly 10 random events spread throughout the game
+    this.events = getRandomEventsForGame(gameLength);
+    
+    console.log(`EventEngine: Initialized with ${this.events.length} events:`);
+    this.events.forEach((event, index) => {
+      console.log(`  ${index + 1}. Month ${event.triggerMonth}: ${event.event}`);
     });
-    
-    // Sort events by trigger month
-    this.events.sort((a, b) => a.triggerMonth - b.triggerMonth);
-    
-    console.log(`EventEngine: Initialized with ${this.events.length} events`);
   }
 
   // Check if any events should be triggered this month
   checkForEvents(currentMonth) {
-    if (!this.hasEconomicEvents) return null;
-    
-    this.currentMonth = currentMonth;
+    if (!this.hasEconomicEvents) {
+      return null;
+    }
     
     // Find events that should trigger this month
     const eventsToTrigger = this.events.filter(event => 
@@ -73,21 +44,16 @@ export class EventEngine {
     );
     
     if (eventsToTrigger.length > 0) {
-      // Mark these events as triggered
-      eventsToTrigger.forEach(event => {
-        this.triggeredEvents.add(event.triggerMonth);
-      });
+      console.log(`Triggering event at month ${currentMonth}:`, eventsToTrigger[0]);
       
-      // Return the first event (in case multiple events are scheduled for the same month)
+      // Mark this event as triggered
+      this.triggeredEvents.add(eventsToTrigger[0].triggerMonth);
+      
+      // Return the first event
       return eventsToTrigger[0];
     }
     
     return null;
-  }
-
-  // Get all events for debugging/testing
-  getAllEvents() {
-    return this.events;
   }
 
   // Get triggered events count
@@ -95,10 +61,14 @@ export class EventEngine {
     return this.triggeredEvents.size;
   }
 
-  // Reset the engine (for new games)
+  // Get all events for debugging
+  getAllEvents() {
+    return this.events;
+  }
+
+  // Reset the engine
   reset() {
     this.triggeredEvents.clear();
-    this.currentMonth = 0;
   }
 }
 
@@ -114,8 +84,7 @@ export const formatEventForDisplay = (event) => {
   return {
     event: event.event,
     sentiment: event.sentiment,
-    month: event.triggerMonth,
-    year: event.year,
-    originalDate: event.date
+    type: event.type,
+    triggerMonth: event.triggerMonth
   };
 };

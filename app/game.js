@@ -195,7 +195,9 @@ export default function GameScreen() {
       setGameData(selectedData);
       
       // Initialize event engine
-      eventEngineRef.current = createEventEngine(selectedData, gameMode, hasEconomicEvents);
+      if (hasEconomicEvents) {
+        eventEngineRef.current = createEventEngine(selectedData, gameMode, hasEconomicEvents);
+      }
       
       // Initialize diversified portfolio - equal allocation across 5 stocks
       const initialAllocation = 10000 / 5; // $2000 per stock
@@ -223,7 +225,9 @@ export default function GameScreen() {
       setGameData(selectedData);
       
       // Initialize event engine
-      eventEngineRef.current = createEventEngine(selectedData, gameMode, hasEconomicEvents);
+      if (hasEconomicEvents) {
+        eventEngineRef.current = createEventEngine(selectedData, gameMode, hasEconomicEvents);
+      }
       
       const startingPrice = selectedData[0].value;
       const startingShares = 10000 / startingPrice;
@@ -242,22 +246,60 @@ export default function GameScreen() {
   };
 
   const checkForEconomicEvents = (month) => {
-    if (!eventEngineRef.current) return;
+    if (!eventEngineRef.current || !hasEconomicEvents) return;
     
+    console.log(`Checking for events at month ${month}`);
     const event = eventEngineRef.current.checkForEvents(month);
-    if (event && hasNewsFlashes) {
+    
+    if (event) {
       const formattedEvent = formatEventForDisplay(event);
-      setCurrentEvent(formattedEvent);
-      setShowNewsFlash(true);
+      console.log('Event triggered:', formattedEvent);
       
-      // Add to event history
+      // Add to event history regardless of news flash setting
       setEventHistory(prev => [...prev, formattedEvent]);
+      
+      // Show news flash if enabled
+      if (hasNewsFlashes) {
+        console.log('Setting news flash state:', formattedEvent);
+        setCurrentEvent(formattedEvent);
+        setShowNewsFlash(true);
+        console.log('News flash state set - showNewsFlash should be true');
+        // Pause the game while showing news flash
+        setIsPlaying(false);
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+      }
     }
   };
 
   const dismissNewsFlash = () => {
     setShowNewsFlash(false);
     setCurrentEvent(null);
+    // Resume the game after news flash
+    if (!isPaused && !gameComplete) {
+      startGame();
+    }
+  };
+
+  const handleNewsFlashBuy = () => {
+    if (gameMode === 'classic' && !isInvested && playerCash > 0) {
+      const sharesCanBuy = playerCash / currentPrices.SP500;
+      setPlayerShares(sharesCanBuy);
+      setPlayerCash(0);
+      setIsInvested(true);
+      console.log('Bought all shares from news flash');
+    }
+  };
+
+  const handleNewsFlashSell = () => {
+    if (gameMode === 'classic' && isInvested && playerShares > 0) {
+      const cashFromSale = playerShares * currentPrices.SP500;
+      setPlayerCash(cashFromSale);
+      setPlayerShares(0);
+      setIsInvested(false);
+      console.log('Sold all shares from news flash');
+    }
   };
 
   const startGame = () => {
@@ -318,7 +360,7 @@ export default function GameScreen() {
             }
           }
 
-          if (nextMonth >= (gameMode === 'diversified' ? gameData.SP500.length : gameData.length)) {
+          if (nextMonth >= gameLength) {
             // Game complete
             setIsPlaying(false);
             setGameComplete(true);
@@ -502,6 +544,15 @@ export default function GameScreen() {
     return `${sign}${value.toFixed(2)}%`;
   };
 
+  // Generate a random month name to hide the actual date
+  const getRandomMonthName = (monthIndex) => {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[monthIndex % 12];
+  };
+
   if (!gameData) {
     return (
       <LinearGradient colors={['#1a1a2e', '#16213e']} style={gameStyles.container}>
@@ -526,7 +577,7 @@ export default function GameScreen() {
             Year {Math.floor(currentMonth / 12) + 1} of {gameYears}
           </Animated.Text>
           <Text style={gameStyles.progressSubtitle}>
-            Month {(currentMonth % 12) + 1} • {gameMode === 'diversified' ? gameData.SP500[currentMonth]?.date : gameData[currentMonth]?.date}
+            {getRandomMonthName(currentMonth)}
             {gameMode === 'speedrun' && ' • 2x Speed'}
           </Text>
           <View style={gameStyles.progressBar}>
@@ -551,6 +602,7 @@ export default function GameScreen() {
             {gameMode === 'diversified' && '📊 Diversified Mode'}
             {gameMode === 'speedrun' && '⚡ Speed Run Mode'}
             {hasEconomicEvents && ' • Economic Events'}
+            {hasNewsFlashes && ' • News Flashes'}
           </Text>
         </View>
 
@@ -749,11 +801,30 @@ export default function GameScreen() {
         onDismiss={() => setShowExitModal(false)}
       />
       
-      {/* News Flash Overlay */}
+      {/* News Flash Overlay - Debug Info */}
+      {showNewsFlash && (
+        <View style={{
+          position: 'absolute',
+          top: 50,
+          right: 10,
+          backgroundColor: 'red',
+          padding: 5,
+          zIndex: 9999
+        }}>
+          <Text style={{ color: 'white', fontSize: 10 }}>
+            NewsFlash Debug: visible={showNewsFlash.toString()}, event={currentEvent ? 'yes' : 'no'}
+          </Text>
+        </View>
+      )}
+      
       <NewsFlash 
         event={currentEvent}
         visible={showNewsFlash}
         onDismiss={dismissNewsFlash}
+        onBuy={handleNewsFlashBuy}
+        onSell={handleNewsFlashSell}
+        canBuy={gameMode === 'classic' && !isInvested && playerCash > 0}
+        canSell={gameMode === 'classic' && isInvested && playerShares > 0}
       />
     </LinearGradient>
   );
