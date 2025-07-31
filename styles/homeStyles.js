@@ -1,5 +1,9 @@
 // styles/homeStyles.js
-import { StyleSheet } from 'react-native';
+// Enhanced styles implementing Material Design 3 and Human Interface Guidelines
+
+import { StyleSheet, Dimensions } from 'react-native';
+
+const { width } = Dimensions.get('window');
 
 export const homeStyles = StyleSheet.create({
   container: {
@@ -7,250 +11,346 @@ export const homeStyles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 20,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
   },
   
-  // Hero Section
+  // Hero Section - Material Design 3 elevated surfaces
   heroSection: {
     alignItems: 'center',
-    marginTop: 40,
-    marginBottom: 40,
+    marginTop: 60,
+    marginBottom: 32,
+  },
+  heroIconContainer: {
+    position: 'relative',
+    marginBottom: 24,
+    // Material Design 3 elevation level 2
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   heroIcon: {
-    position: 'relative',
-    marginBottom: 20,
+    width: 80,
+    height: 80,
+    borderRadius: 20, // Material Design 3 corner radius
+    backgroundColor: 'rgba(79, 172, 254, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(79, 172, 254, 0.2)',
   },
   heroIconBadge: {
     position: 'absolute',
-    top: -8,
-    right: -8,
+    top: -4,
+    right: -4,
     backgroundColor: '#ff6b6b',
-    borderRadius: 16,
-    width: 32,
-    height: 32,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#1a1a2e',
   },
+  
+  // Typography - Enhanced hierarchy following Material Design 3
   heroTitle: {
-    fontSize: 42,
-    fontWeight: 'bold',
+    fontSize: 48, // Display Large in Material 3
+    fontWeight: '700',
     color: '#fff',
     marginBottom: 8,
     textAlign: 'center',
+    letterSpacing: -0.5,
   },
   heroSubtitle: {
-    fontSize: 20,
+    fontSize: 20, // Title Large in Material 3
+    fontWeight: '400',
     color: '#8e8e93',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
+    lineHeight: 28,
+    maxWidth: width * 0.8,
   },
-  heroChallenge: {
-    backgroundColor: 'rgba(255, 107, 107, 0.1)',
-    borderRadius: 12,
+  
+  // Challenge card with Material Design 3 surface treatment
+  challengeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 107, 107, 0.08)', // Material 3 surface tint
+    borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 107, 0.3)',
-    alignItems: 'center',
+    borderColor: 'rgba(255, 107, 107, 0.2)',
+    // Material Design 3 elevation level 1
+    shadowColor: '#ff6b6b',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
+    maxWidth: width * 0.9,
+    minHeight: 64, // Material 3 minimum touch target
   },
-  challengeLabel: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#ff6b6b',
-    marginBottom: 4,
+  challengeIcon: {
+    marginRight: 12,
   },
-  challengeText: {
-    fontSize: 16,
-    color: '#8e8e93',
-    textAlign: 'center',
-  },
-
-  // Quick Stats
-  quickStats: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 30,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-  },
-  statItem: {
-    alignItems: 'center',
+  challengeContent: {
     flex: 1,
   },
+  challengeLabel: {
+    fontSize: 14, // Label Large in Material 3
+    fontWeight: '600',
+    color: '#ff6b6b',
+    marginBottom: 2,
+    letterSpacing: 0.1,
+  },
+  challengeText: {
+    fontSize: 16, // Body Large in Material 3
+    fontWeight: '400',
+    color: '#8e8e93',
+    lineHeight: 22,
+  },
+
+  // Stats section with improved spacing and hierarchy
+  statsSection: {
+    marginBottom: 40,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    // Material Design 3 elevation level 1
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  statCard: {
+    alignItems: 'center',
+    flex: 1,
+    minHeight: 90,
+    paddingHorizontal: 2, // Reduced padding for more space
+  },
+  statIconWrapper: {
+    marginBottom: 6,
+  },
   statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 18, // Further reduced from 20 for better fit
+    fontWeight: '700',
     color: '#fff',
     marginBottom: 4,
+    letterSpacing: -0.3, // Tighter letter spacing
+    textAlign: 'center',
+    lineHeight: 20, // Explicit line height
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 10, // Further reduced from 11 for better fit
+    fontWeight: '500',
     color: '#8e8e93',
-    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.2, // Reduced letter spacing
+    textAlign: 'center',
+    lineHeight: 12,
+    flexWrap: 'wrap', // Allow text wrapping if needed
   },
   statDivider: {
     width: 1,
-    height: 40,
+    height: 48,
     backgroundColor: 'rgba(255,255,255,0.1)',
-    marginHorizontal: 10,
+    marginHorizontal: 12, // Reduced from 16 for more space
   },
 
-  // Game Modes Section
-  modesSection: {
-    marginBottom: 30,
+  // How it works section with Material Design 3 cards
+  howItWorksSection: {
+    marginBottom: 40,
   },
   sectionTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
+    fontSize: 28, // Headline Small in Material 3
+    fontWeight: '700',
     color: '#fff',
-    marginBottom: 20,
+    marginBottom: 8,
     textAlign: 'center',
+    letterSpacing: -0.3,
   },
-  modeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  modeIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  modeContent: {
-    flex: 1,
-  },
-  modeTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  modeDescription: {
-    fontSize: 14,
+  sectionSubtitle: {
+    fontSize: 16, // Body Large in Material 3
+    fontWeight: '400',
     color: '#8e8e93',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 24,
+    maxWidth: width * 0.85,
+    alignSelf: 'center',
   },
-  modeBadge: {
-    backgroundColor: 'rgba(79, 172, 254, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#4facfe',
-  },
-
-  // How It Works Section
-  howItWorksSection: {
-    marginBottom: 30,
-  },
-  stepContainer: {
+  stepsContainer: {
     gap: 16,
   },
-  step: {
+  stepCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    minHeight: 72, // Adequate touch target
+    // Material Design 3 elevation level 1
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  stepIconContainer: {
+    position: 'relative',
+    marginRight: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 56,
+    height: 56,
+    borderRadius: 16,
   },
   stepNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#4facfe',
+    position: 'absolute',
+    top: -4,
+    left: -4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    zIndex: 1,
   },
   stepNumberText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 12,
+    fontWeight: '700',
     color: '#fff',
   },
   stepContent: {
     flex: 1,
   },
   stepTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 16, // Title Medium in Material 3
+    fontWeight: '600',
     color: '#fff',
-    marginBottom: 2,
+    marginBottom: 4,
+    letterSpacing: 0.1,
   },
   stepDescription: {
-    fontSize: 14,
+    fontSize: 14, // Body Medium in Material 3
+    fontWeight: '400',
     color: '#8e8e93',
+    lineHeight: 20,
   },
 
-  // Fun Facts
-  funFactsSection: {
+  // Fun fact section with enhanced visual treatment
+  funFactSection: {
     marginBottom: 40,
   },
   factCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 107, 107, 0.1)',
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 107, 107, 0.06)',
+    borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 107, 0.3)',
+    borderColor: 'rgba(255, 107, 107, 0.2)',
     gap: 16,
+    // Material Design 3 elevation level 1
+    shadowColor: '#ff6b6b',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  factIconContainer: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  factContent: {
+    flex: 1,
   },
   factText: {
-    flex: 1,
-    fontSize: 16,
+    fontSize: 16, // Body Large in Material 3
+    fontWeight: '400',
     color: '#8e8e93',
-    lineHeight: 22,
+    lineHeight: 24,
+    marginBottom: 4,
   },
   factHighlight: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 20, // Title Medium in Material 3
+    fontWeight: '700',
     color: '#ff6b6b',
   },
-
-  // Play Button
-  playButton: {
-    marginBottom: 30,
-    borderRadius: 20,
-    overflow: 'hidden',
-    elevation: 12,
-    shadowColor: '#4facfe',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
+  factSource: {
+    fontSize: 12, // Label Small in Material 3
+    fontWeight: '500',
+    color: '#8e8e93',
+    fontStyle: 'italic',
+    opacity: 0.7,
   },
-  playGradient: {
+
+  // Enhanced CTA button with Material Design 3 principles
+  ctaButton: {
+    marginBottom: 32,
+    borderRadius: 20, // Material 3 corner radius
+    overflow: 'hidden',
+    // Material Design 3 elevation level 3
+    shadowColor: '#4facfe',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  ctaGradient: {
+    paddingVertical: 18,
+    paddingHorizontal: 32,
+    minHeight: 56, // Material 3 minimum button height
+  },
+  ctaContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
     gap: 12,
   },
-  playText: {
+  ctaText: {
     color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18, // Title Medium in Material 3
+    fontWeight: '600',
+    letterSpacing: 0.1,
   },
 
-  // Disclaimer
-  disclaimer: {
+  // Disclaimer with improved accessibility
+  disclaimerSection: {
     alignItems: 'center',
     marginBottom: 20,
   },
+  disclaimerCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    gap: 8,
+    maxWidth: width * 0.9,
+  },
   disclaimerText: {
-    fontSize: 12,
+    flex: 1,
+    fontSize: 12, // Label Large in Material 3
+    fontWeight: '400',
     color: '#8e8e93',
-    textAlign: 'center',
+    textAlign: 'left',
     lineHeight: 18,
     opacity: 0.8,
   },
@@ -326,5 +426,38 @@ export const homeStyles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
+  },
+  playButton: {
+    marginBottom: 30,
+    borderRadius: 20,
+    overflow: 'hidden',
+    elevation: 12,
+    shadowColor: '#4facfe',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+  },
+  playGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    gap: 12,
+  },
+  playText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  disclaimer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  disclaimerText: {
+    fontSize: 12,
+    color: '#8e8e93',
+    textAlign: 'center',
+    lineHeight: 18,
+    opacity: 0.8,
   },
 });
