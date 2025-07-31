@@ -1,5 +1,5 @@
 // app/setup.js
-// Game setup and mode selection screen
+// Game setup and mode selection screen - UPDATED with consolidated events
 
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
@@ -13,7 +13,6 @@ export default function SetupScreen() {
   
   const [selectedMode, setSelectedMode] = useState('classic');
   const [economicEvents, setEconomicEvents] = useState(false);
-  const [newsFlashes, setNewsFlashes] = useState(false);
 
   const gameModes = [
     {
@@ -45,7 +44,7 @@ export default function SetupScreen() {
       params: {
         mode: selectedMode,
         economicEvents: economicEvents.toString(),
-        newsFlashes: newsFlashes.toString()
+        newsFlashes: economicEvents.toString() // Same as economic events now
       }
     });
   };
@@ -124,7 +123,7 @@ export default function SetupScreen() {
             <View style={setupStyles.optionContent}>
               <Text style={setupStyles.optionTitle}>Economic Events</Text>
               <Text style={setupStyles.optionDescription}>
-                Random economic news during gameplay
+                Breaking news alerts with buy/sell decisions during gameplay
               </Text>
             </View>
             
@@ -135,37 +134,6 @@ export default function SetupScreen() {
               <View style={[
                 setupStyles.toggleButton,
                 economicEvents && setupStyles.toggleButtonActive
-              ]} />
-            </View>
-          </Pressable>
-
-          {/* News Flashes Toggle */}
-          <Pressable
-            style={setupStyles.optionCard}
-            onPress={() => setNewsFlashes(!newsFlashes)}
-          >
-            <View style={setupStyles.optionIcon}>
-              <Ionicons 
-                name="flash" 
-                size={20} 
-                color={newsFlashes ? '#4facfe' : '#8e8e93'} 
-              />
-            </View>
-            
-            <View style={setupStyles.optionContent}>
-              <Text style={setupStyles.optionTitle}>News Flashes</Text>
-              <Text style={setupStyles.optionDescription}>
-                Breaking news animations and alerts
-              </Text>
-            </View>
-            
-            <View style={[
-              setupStyles.toggle,
-              newsFlashes && setupStyles.toggleActive
-            ]}>
-              <View style={[
-                setupStyles.toggleButton,
-                newsFlashes && setupStyles.toggleButtonActive
               ]} />
             </View>
           </Pressable>

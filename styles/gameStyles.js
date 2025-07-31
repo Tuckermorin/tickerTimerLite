@@ -57,6 +57,23 @@ export const gameStyles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
+  bonusNotification: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(56, 239, 125, 0.2)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 15,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 239, 125, 0.4)',
+  },
+  bonusText: {
+    fontSize: 14,
+    color: '#38ef7d',
+    fontWeight: 'bold',
+  },
   marketSection: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,

@@ -1,5 +1,5 @@
 // app/index.js
-// Gamified welcome screen with enhanced organization
+// Gamified welcome screen with enhanced organization - UPDATED
 
 import React, { useEffect, useRef } from 'react';
 import { View, Text, ScrollView, Pressable, Animated } from 'react-native';
@@ -113,53 +113,6 @@ export default function Welcome() {
               <Text style={homeStyles.statNumber}>~500%</Text>
               <Text style={homeStyles.statLabel}>Growth</Text>
               <Ionicons name="trophy" size={20} color="#ffce54" />
-            </View>
-          </Animated.View>
-
-          {/* Game Modes Preview */}
-          <Animated.View style={[
-            homeStyles.modesSection,
-            { transform: [{ translateY: slideAnims[2] }] }
-          ]}>
-            <Text style={homeStyles.sectionTitle}>🎮 Choose Your Challenge</Text>
-            
-            <View style={homeStyles.modeCard}>
-              <View style={homeStyles.modeIcon}>
-                <Ionicons name="trending-up" size={24} color="#4facfe" />
-              </View>
-              <View style={homeStyles.modeContent}>
-                <Text style={homeStyles.modeTitle}>Classic Mode</Text>
-                <Text style={homeStyles.modeDescription}>S&P 500 • Perfect for beginners</Text>
-              </View>
-              <View style={homeStyles.modeBadge}>
-                <Text style={homeStyles.badgeText}>EASY</Text>
-              </View>
-            </View>
-
-            <View style={homeStyles.modeCard}>
-              <View style={homeStyles.modeIcon}>
-                <Ionicons name="pie-chart" size={24} color="#38ef7d" />
-              </View>
-              <View style={homeStyles.modeContent}>
-                <Text style={homeStyles.modeTitle}>Diversified Mode</Text>
-                <Text style={homeStyles.modeDescription}>5 Real Stocks • More complex</Text>
-              </View>
-              <View style={[homeStyles.modeBadge, { backgroundColor: 'rgba(56, 239, 125, 0.2)' }]}>
-                <Text style={[homeStyles.badgeText, { color: '#38ef7d' }]}>HARD</Text>
-              </View>
-            </View>
-
-            <View style={homeStyles.modeCard}>
-              <View style={homeStyles.modeIcon}>
-                <Ionicons name="flash" size={24} color="#ffce54" />
-              </View>
-              <View style={homeStyles.modeContent}>
-                <Text style={homeStyles.modeTitle}>Speed Run</Text>
-                <Text style={homeStyles.modeDescription}>10 Years • 2x Speed • Time pressure</Text>
-              </View>
-              <View style={[homeStyles.modeBadge, { backgroundColor: 'rgba(255, 206, 84, 0.2)' }]}>
-                <Text style={[homeStyles.badgeText, { color: '#ffce54' }]}>FAST</Text>
-              </View>
             </View>
           </Animated.View>
 
