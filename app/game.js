@@ -8,11 +8,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { gameStyles } from '../styles/gameStyles';
 import { getRandomPeriod } from '../utils/fullHistoricalData';
-import { getRandomMultiStockPeriod, stockMetadata, getStockColor } from '../utils/stockData';
+import { getRandomMultiStockPeriod, stockMetadata } from '../utils/stockData';
 import { createEventEngine, formatEventForDisplay } from '../utils/eventEngine';
 import NewsFlash from '../components/NewsFlash';
 import CustomModal from '../components/CustomModal';
 import { useSettings } from '../contexts/SettingsContext';
+import GameProgress from '../components/GameProgress';
+import MarketData from '../components/MarketData';
+import PortfolioSummary from '../components/PortfolioSummary';
+import ActionButtons from '../components/ActionButtons';
+import GameControls from '../components/GameControls';
+import ModeBadge from '../components/ModeBadge';
 
 export default function GameScreen() {
   const router = useRouter();
@@ -705,40 +711,18 @@ export default function GameScreen() {
       <ScrollView style={gameStyles.content} showsVerticalScrollIndicator={false}>
         
         {/* Game Progress */}
-        <View style={gameStyles.progressSection}>
-          <Animated.Text style={[gameStyles.progressTitle, {
-            transform: [{ scale: isPlaying ? pulseAnim : 1 }]
-          }]}>
-            Year {Math.floor(currentMonth / 12) + 1} of {gameYears}
-          </Animated.Text>
-          <Text style={gameStyles.progressSubtitle}>
-            {getRandomMonthName(currentMonth)}
-            {gameMode === 'speedrun' && ' • 2x Speed'}
-          </Text>
-          <View style={gameStyles.progressBar}>
-            <Animated.View 
-              style={[
-                gameStyles.progressFill, 
-                { 
-                  width: progressAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', '100%']
-                  })
-                }
-              ]} 
-            />
-          </View>
-        </View>
+        <GameProgress
+          currentMonth={currentMonth}
+          gameYears={gameYears}
+          monthName={getRandomMonthName(currentMonth)}
+          isPlaying={isPlaying}
+          pulseAnim={pulseAnim}
+          progressAnim={progressAnim}
+          gameMode={gameMode}
+        />
 
         {/* Game Mode Badge */}
-        <View style={gameStyles.modeSection}>
-          <Text style={gameStyles.modeText}>
-            {gameMode === 'classic' && '📈 Classic Mode'}
-            {gameMode === 'diversified' && '📊 Diversified Mode'}
-            {gameMode === 'speedrun' && '⚡ Speed Run Mode'}
-            {hasEconomicEvents && ' • Economic Events'}
-          </Text>
-        </View>
+        <ModeBadge gameMode={gameMode} hasEconomicEvents={hasEconomicEvents} />
 
         {/* Annual Bonus Notification */}
         {showBonusNotification && (
@@ -765,144 +749,43 @@ export default function GameScreen() {
         )}
 
         {/* Market Data */}
-        {gameMode === 'diversified' ? (
-          <View style={gameStyles.stocksSection}>
-            <Text style={gameStyles.sectionTitle}>Market Prices</Text>
-            <View style={gameStyles.stocksGrid}>
-              {Object.keys(stockMetadata).map(symbol => (
-                <Animated.View 
-                  key={symbol} 
-                  style={[gameStyles.stockCard, {
-                    transform: priceAnimations.current[symbol] ? [{
-                      translateY: priceAnimations.current[symbol].interpolate({
-                        inputRange: [-0.1, 0, 0.1],
-                        outputRange: [5, 0, -5]
-                      })
-                    }] : []
-                  }]}
-                >
-                  <View style={gameStyles.stockHeader}>
-                    <Text style={gameStyles.stockSymbol}>{symbol}</Text>
-                    <Text style={[
-                      gameStyles.stockChange,
-                      { color: (monthlyChanges[symbol] || 0) >= 0 ? '#38ef7d' : '#ff6b6b' }
-                    ]}>
-                      {formatPercentage(monthlyChanges[symbol] || 0)}
-                    </Text>
-                  </View>
-                  <Text style={gameStyles.stockPrice}>
-                    {formatCurrency(currentPrices[symbol] || 0)}
-                  </Text>
-                  <Text style={gameStyles.stockName}>
-                    {stockMetadata[symbol].name}
-                  </Text>
-                </Animated.View>
-              ))}
-            </View>
-          </View>
-        ) : (
-          <Animated.View style={[gameStyles.marketSection, {
-            transform: priceAnimations.current.SP500 ? [{
-              translateY: priceAnimations.current.SP500.interpolate({
-                inputRange: [-0.1, 0, 0.1],
-                outputRange: [5, 0, -5]
-              })
-            }] : []
-          }]}>
-            <Text style={gameStyles.sectionTitle}>S&P 500</Text>
-            <Text style={gameStyles.marketPrice}>{formatCurrency(currentPrices.SP500 || 0)}</Text>
-            <Text style={[
-              gameStyles.marketChange,
-              { color: (monthlyChanges.SP500 || 0) >= 0 ? '#38ef7d' : '#ff6b6b' }
-            ]}>
-              {formatPercentage(monthlyChanges.SP500 || 0)} this month
-            </Text>
-          </Animated.View>
-        )}
+        <MarketData
+          gameMode={gameMode}
+          stockMetadata={stockMetadata}
+          priceAnimations={priceAnimations}
+          monthlyChanges={monthlyChanges}
+          currentPrices={currentPrices}
+          formatPercentage={formatPercentage}
+          formatCurrency={formatCurrency}
+        />
 
         {/* Portfolio Summary */}
-        <View style={gameStyles.portfolioSection}>
-          <Text style={gameStyles.sectionTitle}>Your Portfolio</Text>
-          
-          <View style={gameStyles.portfolioGrid}>
-            <View style={gameStyles.portfolioCard}>
-              <Text style={gameStyles.portfolioLabel}>Current Value</Text>
-              <Animated.Text style={gameStyles.portfolioValue}>
-                {formatCurrency(getCurrentPortfolioValue())}
-              </Animated.Text>
-            </View>
-            
-            <View style={gameStyles.portfolioCard}>
-              <Text style={gameStyles.portfolioLabel}>vs Buy & Hold</Text>
-              <Animated.Text style={gameStyles.portfolioValue}>
-                {formatCurrency(getBuyHoldValue())}
-              </Animated.Text>
-            </View>
-          </View>
-        </View>
+        <PortfolioSummary
+          formatCurrency={formatCurrency}
+          getCurrentPortfolioValue={getCurrentPortfolioValue}
+          getBuyHoldValue={getBuyHoldValue}
+        />
 
         {/* Action Buttons - NOW AVAILABLE FOR ALL MODES */}
-        {isPlaying && (
-          <View style={gameStyles.actionSection}>
-            <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
-              <Pressable 
-                style={[
-                  gameStyles.actionButton, 
-                  gameStyles.buyButton,
-                  { opacity: canBuy() ? 1 : 0.5 }
-                ]}
-                onPress={buyAll}
-                disabled={!canBuy()}
-              >
-                <Ionicons name="trending-up" size={20} color="#fff" />
-                <Text style={gameStyles.actionButtonText}>BUY ALL</Text>
-              </Pressable>
-            </Animated.View>
-            
-            <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
-              <Pressable 
-                style={[
-                  gameStyles.actionButton, 
-                  gameStyles.sellButton,
-                  { opacity: canSell() ? 1 : 0.5 }
-                ]}
-                onPress={sellAll}
-                disabled={!canSell()}
-              >
-                <Ionicons name="trending-down" size={20} color="#fff" />
-                <Text style={gameStyles.actionButtonText}>SELL ALL</Text>
-              </Pressable>
-            </Animated.View>
-          </View>
-        )}
+        <ActionButtons
+          isPlaying={isPlaying}
+          canBuy={canBuy()}
+          canSell={canSell()}
+          buyAll={buyAll}
+          sellAll={sellAll}
+          buttonScaleAnim={buttonScaleAnim}
+        />
 
         {/* Game Controls */}
-        <View style={gameStyles.controlSection}>
-          {!isPlaying && !gameComplete && (
-            <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
-              <Pressable style={gameStyles.controlButton} onPress={startGame}>
-                <Ionicons name="play" size={20} color="#fff" />
-                <Text style={gameStyles.controlButtonText}>
-                  {isPaused ? 'Resume' : 'Start Game'}
-                </Text>
-              </Pressable>
-            </Animated.View>
-          )}
-          
-          {isPlaying && (
-            <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
-              <Pressable style={gameStyles.controlButton} onPress={pauseGame}>
-                <Ionicons name="pause" size={20} color="#fff" />
-                <Text style={gameStyles.controlButtonText}>Pause</Text>
-              </Pressable>
-            </Animated.View>
-          )}
-          
-          <Pressable style={gameStyles.menuButton} onPress={goToMenu}>
-            <Ionicons name="home" size={20} color="#fff" />
-            <Text style={gameStyles.menuButtonText}>Menu</Text>
-          </Pressable>
-        </View>
+        <GameControls
+          isPlaying={isPlaying}
+          isPaused={isPaused}
+          gameComplete={gameComplete}
+          startGame={startGame}
+          pauseGame={pauseGame}
+          goToMenu={goToMenu}
+          buttonScaleAnim={buttonScaleAnim}
+        />
 
         {gameComplete && (
           <Animated.View style={[gameStyles.completeSection, {
