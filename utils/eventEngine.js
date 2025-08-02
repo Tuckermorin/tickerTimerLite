@@ -1,5 +1,5 @@
 // utils/eventEngine.js
-// Simplified event engine for 10 random news flashes per game
+// Fixed event engine with proper formatting
 
 import { getRandomEventsForGame } from './economicEvents';
 
@@ -77,7 +77,7 @@ export const createEventEngine = (gameData, gameMode, hasEconomicEvents) => {
   return new EventEngine(gameData, gameMode, hasEconomicEvents);
 };
 
-// Helper function to format event for display
+// Helper function to format event for display - FIXED VERSION
 export const formatEventForDisplay = (event) => {
   if (!event) return null;
   
