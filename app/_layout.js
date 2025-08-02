@@ -1,12 +1,13 @@
 // app/_layout.js
-// Root layout with setup screen added to navigation
+// Root layout with settings screen and context provider
 
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SettingsProvider } from '../contexts/SettingsContext';
 
 export default function RootLayout() {
   return (
-    <>
+    <SettingsProvider>
       <StatusBar style="light" backgroundColor="#1a1a2e" />
       <Stack
         screenOptions={{
@@ -49,7 +50,14 @@ export default function RootLayout() {
             headerBackTitle: 'Game',
           }}
         />
+        <Stack.Screen
+          name="settings"
+          options={{
+            title: 'Settings',
+            headerBackTitle: 'Home',
+          }}
+        />
       </Stack>
-    </>
+    </SettingsProvider>
   );
 }

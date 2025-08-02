@@ -461,3 +461,120 @@ export const homeStyles = StyleSheet.create({
     opacity: 0.8,
   },
 });
+
+// styles/homeStyles.js (additions for light mode support)
+// Add these styles to your existing homeStyles.js file
+
+// Settings button styles
+export const settingsButtonStyles = {
+  settingsButtonContainer: {
+    position: 'absolute',
+    top: 50, // Reduced from 60 to bring it down
+    right: 20,
+    zIndex: 1000,
+  },
+  settingsButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  settingsButtonLight: {
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderColor: 'rgba(0,0,0,0.1)',
+  },
+  
+  // Light mode overrides for existing styles
+  heroIconLight: {
+    backgroundColor: 'rgba(79, 172, 254, 0.1)',
+    borderColor: 'rgba(79, 172, 254, 0.3)',
+  },
+  heroTitleLight: {
+    color: '#212529',
+  },
+  heroSubtitleLight: {
+    color: '#6c757d',
+  },
+  challengeCardLight: {
+    backgroundColor: 'rgba(255, 107, 107, 0.08)',
+    borderColor: 'rgba(255, 107, 107, 0.2)',
+    shadowColor: '#ff6b6b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  challengeLabelLight: {
+    color: '#ff6b6b',
+  },
+  challengeTextLight: {
+    color: '#6c757d',
+  },
+  statsContainerLight: {
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    borderColor: 'rgba(0,0,0,0.08)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  statNumberLight: {
+    color: '#212529',
+  },
+  statLabelLight: {
+    color: '#6c757d',
+  },
+  sectionTitleLight: {
+    color: '#212529',
+  },
+  sectionSubtitleLight: {
+    color: '#6c757d',
+  },
+  stepCardLight: {
+    backgroundColor: 'rgba(0,0,0,0.02)',
+    borderColor: 'rgba(0,0,0,0.06)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  stepTitleLight: {
+    color: '#212529',
+  },
+  stepDescriptionLight: {
+    color: '#6c757d',
+  },
+  factCardLight: {
+    backgroundColor: 'rgba(255, 107, 107, 0.05)',
+    borderColor: 'rgba(255, 107, 107, 0.15)',
+    shadowColor: '#ff6b6b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  factTextLight: {
+    color: '#6c757d',
+  },
+  factSourceLight: {
+    color: '#6c757d',
+  },
+  disclaimerCardLight: {
+    backgroundColor: 'rgba(0,0,0,0.02)',
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  disclaimerTextLight: {
+    color: '#6c757d',
+  },
+};

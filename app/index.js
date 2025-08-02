@@ -1,5 +1,5 @@
 // app/index.js
-// Enhanced home screen implementing Material Design 3 and Human Interface Guidelines
+// Enhanced home screen with settings integration and theme support
 
 import React, { useEffect, useRef } from 'react';
 import { View, Text, ScrollView, Pressable, Animated } from 'react-native';
@@ -7,9 +7,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { homeStyles } from '../styles/homeStyles';
+import { useSettings } from '../contexts/SettingsContext';
 
 export default function Welcome() {
   const router = useRouter();
+  const { settings, getThemeColors, formatCurrency } = useSettings();
+  const themeColors = getThemeColors();
+  
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnims = useRef([
@@ -62,9 +66,26 @@ export default function Welcome() {
     router.push('/setup');
   };
 
+  const handleSettingsPress = () => {
+    router.push('/settings');
+  };
+
   return (
-    <LinearGradient colors={['#1a1a2e', '#16213e']} style={homeStyles.container}>
+    <LinearGradient colors={themeColors.background} style={homeStyles.container}>
       <Animated.View style={[homeStyles.content, { opacity: fadeAnim }]}>
+        
+        {/* Settings Button */}
+        <View style={homeStyles.settingsButtonContainer}>
+          <Pressable 
+            style={[homeStyles.settingsButton, settings.theme === 'light' && homeStyles.settingsButtonLight]} 
+            onPress={handleSettingsPress}
+            accessibilityRole="button"
+            accessibilityLabel="Open settings"
+          >
+            <Ionicons name="settings-outline" size={24} color={settings.theme === 'light' ? '#495057' : '#8e8e93'} />
+          </Pressable>
+        </View>
+        
         <ScrollView 
           showsVerticalScrollIndicator={false}
           contentContainerStyle={homeStyles.scrollContent}
@@ -76,7 +97,7 @@ export default function Welcome() {
             { transform: [{ translateY: slideAnims[0] }] }
           ]}>
             <View style={homeStyles.heroIconContainer}>
-              <View style={homeStyles.heroIcon}>
+              <View style={[homeStyles.heroIcon, settings.theme === 'light' && homeStyles.heroIconLight]}>
                 <Ionicons name="trending-up" size={64} color="#4facfe" />
               </View>
               <View style={homeStyles.heroIconBadge}>
@@ -85,21 +106,21 @@ export default function Welcome() {
             </View>
             
             {/* Enhanced typography hierarchy */}
-            <Text style={homeStyles.heroTitle} accessibilityLabel="app-title">
+            <Text style={[homeStyles.heroTitle, settings.theme === 'light' && homeStyles.heroTitleLight]} accessibilityLabel="app-title">
               Ticker Timer
             </Text>
-            <Text style={homeStyles.heroSubtitle} accessibilityLabel="app-subtitle">
+            <Text style={[homeStyles.heroSubtitle, settings.theme === 'light' && homeStyles.heroSubtitleLight]} accessibilityLabel="app-subtitle">
               Can you beat the market by timing it?
             </Text>
             
             {/* Challenge card with elevated surface */}
-            <View style={homeStyles.challengeCard}>
+            <View style={[homeStyles.challengeCard, settings.theme === 'light' && homeStyles.challengeCardLight]}>
               <View style={homeStyles.challengeIcon}>
                 <Ionicons name="trophy-outline" size={24} color="#ff6b6b" />
               </View>
               <View style={homeStyles.challengeContent}>
-                <Text style={homeStyles.challengeLabel}>The Ultimate Challenge</Text>
-                <Text style={homeStyles.challengeText}>
+                <Text style={[homeStyles.challengeLabel, settings.theme === 'light' && homeStyles.challengeLabelLight]}>The Ultimate Challenge</Text>
+                <Text style={[homeStyles.challengeText, settings.theme === 'light' && homeStyles.challengeTextLight]}>
                   Most professionals can't do it. Can you?
                 </Text>
               </View>
@@ -111,13 +132,13 @@ export default function Welcome() {
             homeStyles.statsSection,
             { transform: [{ translateY: slideAnims[1] }] }
           ]}>
-            <View style={homeStyles.statsContainer}>
+            <View style={[homeStyles.statsContainer, settings.theme === 'light' && homeStyles.statsContainerLight]}>
               <View style={homeStyles.statCard}>
                 <View style={homeStyles.statIconWrapper}>
                   <Ionicons name="calendar-outline" size={24} color="#4facfe" />
                 </View>
-                <Text style={homeStyles.statNumber}>20</Text>
-                <Text style={homeStyles.statLabel}>Years</Text>
+                <Text style={[homeStyles.statNumber, settings.theme === 'light' && homeStyles.statNumberLight]}>20</Text>
+                <Text style={[homeStyles.statLabel, settings.theme === 'light' && homeStyles.statLabelLight]}>Years</Text>
               </View>
               
               <View style={homeStyles.statDivider} />
@@ -126,8 +147,8 @@ export default function Welcome() {
                 <View style={homeStyles.statIconWrapper}>
                   <Ionicons name="flash-outline" size={24} color="#38ef7d" />
                 </View>
-                <Text style={homeStyles.statNumber}>Real</Text>
-                <Text style={homeStyles.statLabel}>Data</Text>
+                <Text style={[homeStyles.statNumber, settings.theme === 'light' && homeStyles.statNumberLight]}>Real</Text>
+                <Text style={[homeStyles.statLabel, settings.theme === 'light' && homeStyles.statLabelLight]}>Data</Text>
               </View>
               
               <View style={homeStyles.statDivider} />
@@ -136,8 +157,8 @@ export default function Welcome() {
                 <View style={homeStyles.statIconWrapper}>
                   <Ionicons name="trending-up-outline" size={24} color="#ffce54" />
                 </View>
-                <Text style={homeStyles.statNumber}>Beat</Text>
-                <Text style={homeStyles.statLabel}>Market</Text>
+                <Text style={[homeStyles.statNumber, settings.theme === 'light' && homeStyles.statNumberLight]}>Beat</Text>
+                <Text style={[homeStyles.statLabel, settings.theme === 'light' && homeStyles.statLabelLight]}>Market</Text>
               </View>
             </View>
           </Animated.View>
@@ -147,8 +168,8 @@ export default function Welcome() {
             homeStyles.howItWorksSection,
             { transform: [{ translateY: slideAnims[2] }] }
           ]}>
-            <Text style={homeStyles.sectionTitle}>How It Works</Text>
-            <Text style={homeStyles.sectionSubtitle}>
+            <Text style={[homeStyles.sectionTitle, settings.theme === 'light' && homeStyles.sectionTitleLight]}>How It Works</Text>
+            <Text style={[homeStyles.sectionSubtitle, settings.theme === 'light' && homeStyles.sectionSubtitleLight]}>
               Follow these simple steps to start your market timing challenge
             </Text>
             
@@ -157,7 +178,7 @@ export default function Welcome() {
                 {
                   number: '1',
                   icon: 'wallet-outline',
-                  title: 'Start with $10,000',
+                  title: 'Start with ' + formatCurrency(10000),
                   description: 'Begin fully invested in the market',
                   color: '#4facfe'
                 },
@@ -172,7 +193,7 @@ export default function Welcome() {
                   number: '3',
                   icon: 'gift-outline', 
                   title: 'Get Annual Bonuses',
-                  description: '$5,000 every year to reinvest',
+                  description: formatCurrency(5000) + ' every year to reinvest',
                   color: '#ffce54'
                 },
                 {
@@ -183,7 +204,7 @@ export default function Welcome() {
                   color: '#ff6b6b'
                 }
               ].map((step, index) => (
-                <View key={index} style={homeStyles.stepCard}>
+                <View key={index} style={[homeStyles.stepCard, settings.theme === 'light' && homeStyles.stepCardLight]}>
                   <View style={[homeStyles.stepIconContainer, { backgroundColor: step.color + '20' }]}>
                     <View style={[homeStyles.stepNumber, { backgroundColor: step.color }]}>
                       <Text style={homeStyles.stepNumberText}>{step.number}</Text>
@@ -191,8 +212,8 @@ export default function Welcome() {
                     <Ionicons name={step.icon} size={24} color={step.color} />
                   </View>
                   <View style={homeStyles.stepContent}>
-                    <Text style={homeStyles.stepTitle}>{step.title}</Text>
-                    <Text style={homeStyles.stepDescription}>{step.description}</Text>
+                    <Text style={[homeStyles.stepTitle, settings.theme === 'light' && homeStyles.stepTitleLight]}>{step.title}</Text>
+                    <Text style={[homeStyles.stepDescription, settings.theme === 'light' && homeStyles.stepDescriptionLight]}>{step.description}</Text>
                   </View>
                 </View>
               ))}
@@ -204,17 +225,17 @@ export default function Welcome() {
             homeStyles.funFactSection,
             { transform: [{ translateY: slideAnims[3] }] }
           ]}>
-            <Text style={homeStyles.sectionTitle}>Did You Know?</Text>
-            <View style={homeStyles.factCard}>
+            <Text style={[homeStyles.sectionTitle, settings.theme === 'light' && homeStyles.sectionTitleLight]}>Did You Know?</Text>
+            <View style={[homeStyles.factCard, settings.theme === 'light' && homeStyles.factCardLight]}>
               <View style={homeStyles.factIconContainer}>
                 <Ionicons name="bar-chart" size={32} color="#ff6b6b" />
               </View>
               <View style={homeStyles.factContent}>
-                <Text style={homeStyles.factText}>
+                <Text style={[homeStyles.factText, settings.theme === 'light' && homeStyles.factTextLight]}>
                   <Text style={homeStyles.factHighlight}>80%</Text> of professional fund managers 
                   fail to beat the market over long periods
                 </Text>
-                <Text style={homeStyles.factSource}>— Academic Research</Text>
+                <Text style={[homeStyles.factSource, settings.theme === 'light' && homeStyles.factSourceLight]}>— Academic Research</Text>
               </View>
             </View>
           </Animated.View>
@@ -244,9 +265,9 @@ export default function Welcome() {
 
           {/* Disclaimer with improved readability */}
           <View style={homeStyles.disclaimerSection}>
-            <View style={homeStyles.disclaimerCard}>
-              <Ionicons name="information-circle-outline" size={16} color="#8e8e93" />
-              <Text style={homeStyles.disclaimerText}>
+            <View style={[homeStyles.disclaimerCard, settings.theme === 'light' && homeStyles.disclaimerCardLight]}>
+              <Ionicons name="information-circle-outline" size={16} color={settings.theme === 'light' ? '#6c757d' : '#8e8e93'} />
+              <Text style={[homeStyles.disclaimerText, settings.theme === 'light' && homeStyles.disclaimerTextLight]}>
                 Educational simulation using real historical data. 
                 Past performance doesn't predict future results.
               </Text>

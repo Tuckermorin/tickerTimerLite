@@ -1,5 +1,5 @@
 // app/game.js
-// Main game screen with React Native Animated API integration - FIXED VERSION
+// Main game screen with React Native Animated API integration - CORRECTED VERSION with Settings
 
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, Animated } from 'react-native';
@@ -12,10 +12,13 @@ import { getRandomMultiStockPeriod, stockMetadata, getStockColor } from '../util
 import { createEventEngine, formatEventForDisplay } from '../utils/eventEngine';
 import NewsFlash from '../components/NewsFlash';
 import CustomModal from '../components/CustomModal';
+import { useSettings } from '../contexts/SettingsContext';
 
 export default function GameScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { settings, formatCurrency, getThemeColors } = useSettings();
+  const themeColors = getThemeColors();
   const intervalRef = useRef(null);
   const eventEngineRef = useRef(null);
   
@@ -670,16 +673,6 @@ export default function GameScreen() {
     }
   };
 
-  // Format currency with animation
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
   // Format percentage
   const formatPercentage = (value) => {
     const sign = value >= 0 ? '+' : '';
@@ -697,7 +690,7 @@ export default function GameScreen() {
 
   if (!gameData) {
     return (
-      <LinearGradient colors={['#1a1a2e', '#16213e']} style={gameStyles.container}>
+      <LinearGradient colors={themeColors.background} style={gameStyles.container}>
         <Animated.View style={[gameStyles.loadingContainer, {
           transform: [{ scale: pulseAnim }]
         }]}>
@@ -708,7 +701,7 @@ export default function GameScreen() {
   }
 
   return (
-    <LinearGradient colors={['#1a1a2e', '#16213e']} style={gameStyles.container}>
+    <LinearGradient colors={themeColors.background} style={gameStyles.container}>
       <ScrollView style={gameStyles.content} showsVerticalScrollIndicator={false}>
         
         {/* Game Progress */}
@@ -754,7 +747,7 @@ export default function GameScreen() {
           }]}>
             <Ionicons name="gift" size={20} color="#38ef7d" />
             <Text style={gameStyles.bonusText}>
-              💰 Annual Bonus: $5,000 Added!
+              💰 Annual Bonus: {formatCurrency(5000)} Added!
             </Text>
           </Animated.View>
         )}
