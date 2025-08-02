@@ -87,8 +87,11 @@ const NewsFlash = ({ event, onDismiss, onBuy, onSell, canBuy, canSell, visible, 
       });
     } else if (!visible) {
       console.log('Resetting animations - not visible');
-      slideAnim.setValue(-200);
-      opacityAnim.setValue(0);
+      // Defer value resets to avoid scheduling updates during render
+      requestAnimationFrame(() => {
+        slideAnim.setValue(-200);
+        opacityAnim.setValue(0);
+      });
     }
   }, [visible, event]);
 
