@@ -1,5 +1,5 @@
 // app/game.js
-// Fixed game screen with optimized speed mode to prevent useInsertionEffect warnings
+// Fixed game screen with improved speed mode navigation and race condition handling
 
 import React, { useState, useEffect, useRef, useReducer, useMemo, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, Animated } from 'react-native';
@@ -21,7 +21,7 @@ import GameControls from '../components/GameControls';
 import ModeBadge from '../components/ModeBadge';
 import { INITIAL_CAPITAL, ANNUAL_BONUS, SPEEDS, DURATIONS } from '../utils/constants';
 
-const debug = __DEV__ ? (tag, ...args) => console.log(tag, ...args) : () => {};
+const debug = __DEV__ ? (tag, ...args) => console.log(`[Game] ${tag}:`, ...args) : () => {};
 
 function portfolioReducer(state, action) {
   switch (action.type) {
@@ -90,6 +90,7 @@ export default function GameScreen() {
 
   const intervalRef = useRef(null);
   const eventEngineRef = useRef(null);
+  const navigationTimeoutRef = useRef(null);
 
   // Simplified animation refs - reduce animations in speed mode
   const priceAnimations = useRef({});
@@ -315,10 +316,15 @@ export default function GameScreen() {
     
     intervalRef.current = setInterval(() => {
       setCurrentMonth(prevMonth => {
-        if (prevMonth >= gameLength - 1) {
+        const nextMonth = prevMonth + 1;
+        debug('monthTick', { prevMonth, nextMonth, gameLength });
+        
+        // Check if game should end
+        if (nextMonth >= gameLength) {
+          debug('gameEnding', { nextMonth, gameLength });
           return prevMonth; // Don't increment past game end
         }
-        return prevMonth + 1;
+        return nextMonth;
       });
     }, gameSpeed);
 
@@ -380,6 +386,7 @@ export default function GameScreen() {
     }
   }, [currentMonth, hasEconomicEvents, gameComplete, isNavigating]);
 
+  // FIXED: Improved navigation to results with better race condition handling
   const navigateToResults = useCallback(() => {
     if (isNavigating) {
       debug('Navigation blocked - already navigating');
@@ -390,7 +397,9 @@ export default function GameScreen() {
       portfolioValue, 
       buyHoldValue, 
       gameMode, 
-      gameYears
+      gameYears,
+      currentMonth,
+      gameLength
     });
     
     setIsNavigating(true);
@@ -413,17 +422,48 @@ export default function GameScreen() {
     };
     
     debug('Navigation params:', navigateParams);
-    router.push(navigateParams);
-  }, [portfolioValue, buyHoldValue, gameMode, gameYears, eventHistory.length, router, isNavigating]);
+    
+    // FIXED: Add a small delay for speed run mode to ensure state is settled
+    const delay = isSpeedMode ? 100 : 0;
+    
+    navigationTimeoutRef.current = setTimeout(() => {
+      router.push(navigateParams);
+    }, delay);
+    
+  }, [portfolioValue, buyHoldValue, gameMode, gameYears, eventHistory.length, router, isNavigating, isSpeedMode, currentMonth, gameLength]);
 
-  // Handle game completion
+  // FIXED: Improved game completion detection with better state handling
   useEffect(() => {
+    debug('gameCompletionCheck', { 
+      currentMonth, 
+      gameLength, 
+      gameComplete, 
+      isNavigating,
+      condition: currentMonth >= gameLength
+    });
+    
     if (currentMonth >= gameLength && !gameComplete && !isNavigating) {
+      debug('gameCompleting', { currentMonth, gameLength });
+      
+      // Stop the game loop immediately
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      
       setIsPlaying(false);
       setGameComplete(true);
-      navigateToResults();
+      
+      // FIXED: For speed mode, add a small delay to ensure all state updates complete
+      const delay = isSpeedMode ? 200 : 100;
+      
+      setTimeout(() => {
+        if (!isNavigating) { // Double-check to prevent duplicate navigation
+          navigateToResults();
+        }
+      }, delay);
     }
-  }, [currentMonth, gameLength, gameComplete, isNavigating, navigateToResults]);
+  }, [currentMonth, gameLength, gameComplete, isNavigating, navigateToResults, isSpeedMode]);
 
   // Simplified portfolio value animations
   useEffect(() => {
@@ -485,6 +525,9 @@ export default function GameScreen() {
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+      }
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
       }
     };
   }, []);
