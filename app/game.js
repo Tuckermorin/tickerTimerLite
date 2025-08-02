@@ -1,7 +1,7 @@
 // app/game.js
-// Main game screen with React Native Animated API integration - CORRECTED VERSION with Settings
+// Main game screen with reducer-based portfolio management and simplified loop
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useReducer, useMemo, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,673 +19,412 @@ import PortfolioSummary from '../components/PortfolioSummary';
 import ActionButtons from '../components/ActionButtons';
 import GameControls from '../components/GameControls';
 import ModeBadge from '../components/ModeBadge';
+import { INITIAL_CAPITAL, ANNUAL_BONUS, SPEEDS, DURATIONS } from '../utils/constants';
+
+const debug = __DEV__ ? (tag, ...args) => console.log(tag, ...args) : () => {};
+
+function portfolioReducer(state, action) {
+  switch (action.type) {
+    case 'INIT':
+      return action.payload;
+    case 'BUY_ALL': {
+      const updated = {};
+      Object.keys(state).forEach(sym => {
+        const { cash, shares } = state[sym];
+        const price = action.prices[sym];
+        updated[sym] = cash > 0 ? { shares: shares + cash / price, cash: 0 } : state[sym];
+      });
+      return { ...state, ...updated };
+    }
+    case 'SELL_ALL': {
+      const updated = {};
+      Object.keys(state).forEach(sym => {
+        const { cash, shares } = state[sym];
+        const price = action.prices[sym];
+        updated[sym] = shares > 0 ? { shares: 0, cash: cash + shares * price } : state[sym];
+      });
+      return { ...state, ...updated };
+    }
+    case 'ADD_ANNUAL_BONUS': {
+      const symbols = Object.keys(state);
+      const perSymbol = ANNUAL_BONUS / symbols.length;
+      const updated = {};
+      symbols.forEach(sym => {
+        const { cash, shares } = state[sym];
+        const price = action.prices[sym];
+        updated[sym] = shares > 0
+          ? { shares: shares + perSymbol / price, cash }
+          : { shares, cash: cash + perSymbol };
+      });
+      return { ...state, ...updated };
+    }
+    default:
+      return state;
+  }
+}
+
+function buyHoldReducer(state, action) {
+  switch (action.type) {
+    case 'INIT':
+      return action.payload;
+    case 'ADD_ANNUAL_BONUS': {
+      const symbols = Object.keys(state);
+      const perSymbol = ANNUAL_BONUS / symbols.length;
+      const updated = {};
+      symbols.forEach(sym => {
+        const price = action.prices[sym];
+        updated[sym] = { shares: state[sym].shares + perSymbol / price };
+      });
+      return { ...state, ...updated };
+    }
+    default:
+      return state;
+  }
+}
 
 export default function GameScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { settings, formatCurrency, getThemeColors } = useSettings();
   const themeColors = getThemeColors();
+
   const intervalRef = useRef(null);
   const eventEngineRef = useRef(null);
-  
-  // Animation refs
+
   const priceAnimations = useRef({});
   const portfolioValueAnim = useRef(new Animated.Value(0)).current;
   const buyHoldValueAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const buttonScaleAnim = useRef(new Animated.Value(1)).current;
-  
-  // Get game parameters from setup
+
   const gameMode = params.mode || 'classic';
   const hasEconomicEvents = params.economicEvents === 'true';
-  // News flashes are now consolidated with economic events
-  const hasNewsFlashes = hasEconomicEvents;
-  
-  // Calculate game length based on mode
-  const gameLength = gameMode === 'speedrun' ? 120 : 240; // 10 or 20 years in months
-  const gameYears = gameMode === 'speedrun' ? 10 : 20;
-  const gameSpeed = gameMode === 'speedrun' ? 500 : 1000; // milliseconds per month
-  
-  // Game state
+
+  const gameSpeed = SPEEDS[gameMode] || SPEEDS.classic;
+  const gameLength = DURATIONS[gameMode] || DURATIONS.classic;
+  const gameYears = gameLength / 12;
+
   const [gameData, setGameData] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [gameComplete, setGameComplete] = useState(false);
   const [showBonusNotification, setShowBonusNotification] = useState(false);
-  
-  // Economic events state
+
   const [currentEvent, setCurrentEvent] = useState(null);
   const [showNewsFlash, setShowNewsFlash] = useState(false);
   const [eventHistory, setEventHistory] = useState([]);
-  
-  // Modal state
   const [showExitModal, setShowExitModal] = useState(false);
-  
-  // Portfolio state for diversified mode
-  const [portfolio, setPortfolio] = useState({
-    SP500: { shares: 0, cash: 0 },
-    AAPL: { shares: 0, cash: 0 },
-    JPM: { shares: 0, cash: 0 },
-    TGT: { shares: 0, cash: 0 },
-    UNH: { shares: 0, cash: 0 }
-  });
-  
-  // Buy-and-hold reference portfolio
-  const [buyHoldPortfolio, setBuyHoldPortfolio] = useState({
-    SP500: { shares: 0 },
-    AAPL: { shares: 0 },
-    JPM: { shares: 0 },
-    TGT: { shares: 0 },
-    UNH: { shares: 0 }
-  });
-  
-  // Classic mode state (backwards compatibility)
-  const [playerCash, setPlayerCash] = useState(0);
-  const [playerShares, setPlayerShares] = useState(0);
-  const [buyHoldShares, setBuyHoldShares] = useState(0);
-  const [isInvested, setIsInvested] = useState(true);
-  
-  // Current market data
+
+  const [portfolio, dispatchPortfolio] = useReducer(portfolioReducer, {});
+  const [buyHoldPortfolio, dispatchBuyHold] = useReducer(buyHoldReducer, {});
   const [currentPrices, setCurrentPrices] = useState({});
-  const [previousPrices, setPreviousPrices] = useState({});
-  const [monthlyChanges, setMonthlyChanges] = useState({});
 
-  // Initialize price animations
-  useEffect(() => {
-    const symbols = gameMode === 'diversified' ? Object.keys(stockMetadata) : ['SP500'];
-    symbols.forEach(symbol => {
-      priceAnimations.current[symbol] = new Animated.Value(0);
-    });
-  }, [gameMode]);
+  const symbols = useMemo(() => (
+    gameMode === 'diversified' ? Object.keys(stockMetadata) : ['SP500']
+  ), [gameMode]);
 
-  // Animate portfolio values when they change
-  useEffect(() => {
-    // Use requestAnimationFrame to defer animations until after render
-    const animateValues = () => {
-      const currentValue = getCurrentPortfolioValue();
-      const buyHoldValue = getBuyHoldValue();
-      
-      animatePortfolioValue(portfolioValueAnim, currentValue);
-      animatePortfolioValue(buyHoldValueAnim, buyHoldValue);
-    };
-
-    // Defer animation to next frame
-    const animationFrame = requestAnimationFrame(animateValues);
-    
-    return () => cancelAnimationFrame(animationFrame);
-  }, [currentPrices, portfolio, buyHoldPortfolio, playerCash, playerShares]);
-
-  // Animate progress bar
-  useEffect(() => {
-    // Defer animation to prevent render phase updates
-    const animateProgress = () => {
-      Animated.timing(progressAnim, {
-        toValue: currentMonth / gameLength,
-        duration: 300,
-        useNativeDriver: false,
-      }).start();
-    };
-
-    const animationFrame = requestAnimationFrame(animateProgress);
-    return () => cancelAnimationFrame(animationFrame);
-  }, [currentMonth, gameLength]);
-
-  // Pulse animation for when game is playing
-  useEffect(() => {
-    if (isPlaying) {
-      // Defer animation start to prevent render phase updates
-      const startPulse = () => {
-        const pulse = Animated.loop(
-          Animated.sequence([
-            Animated.timing(pulseAnim, {
-              toValue: 1.05,
-              duration: 1000,
-              useNativeDriver: true,
-            }),
-            Animated.timing(pulseAnim, {
-              toValue: 1,
-              duration: 1000,
-              useNativeDriver: true,
-            }),
-          ])
-        );
-        pulse.start();
-        return pulse;
-      };
-
-      const animationFrame = requestAnimationFrame(() => {
-        const pulse = startPulse();
-        return () => pulse.stop();
+  const monthlyChanges = useMemo(() => {
+    if (!gameData || currentMonth === 0) return {};
+    if (gameMode === 'diversified') {
+      const changes = {};
+      symbols.forEach(sym => {
+        const newPrice = gameData[sym][currentMonth].value;
+        const oldPrice = gameData[sym][currentMonth - 1].value;
+        changes[sym] = ((newPrice - oldPrice) / oldPrice) * 100;
       });
-      
-      return () => cancelAnimationFrame(animationFrame);
+      return changes;
+    } else {
+      const newPrice = gameData[currentMonth].value;
+      const oldPrice = gameData[currentMonth - 1].value;
+      return { SP500: ((newPrice - oldPrice) / oldPrice) * 100 };
     }
-  }, [isPlaying]);
+  }, [currentMonth, gameData, gameMode, symbols]);
+
+  const portfolioValue = useMemo(() => {
+    return Object.keys(portfolio).reduce((total, sym) => {
+      const price = currentPrices[sym] || 0;
+      const { shares = 0, cash = 0 } = portfolio[sym] || {};
+      return total + shares * price + cash;
+    }, 0);
+  }, [portfolio, currentPrices]);
+
+  const buyHoldValue = useMemo(() => {
+    return Object.keys(buyHoldPortfolio).reduce((total, sym) => {
+      const price = currentPrices[sym] || 0;
+      const { shares = 0 } = buyHoldPortfolio[sym] || {};
+      return total + shares * price;
+    }, 0);
+  }, [buyHoldPortfolio, currentPrices]);
+
+  const canBuy = useMemo(() => {
+    return Object.values(portfolio).some(p => p.cash > 0);
+  }, [portfolio]);
+
+  const canSell = useMemo(() => {
+    return Object.values(portfolio).some(p => p.shares > 0);
+  }, [portfolio]);
+
+  const getCurrentPortfolioValue = useCallback(() => portfolioValue, [portfolioValue]);
+  const getBuyHoldValue = useCallback(() => buyHoldValue, [buyHoldValue]);
 
   const animatePortfolioValue = (animatedValue, targetValue) => {
-    // Defer animation to prevent render phase updates
-    requestAnimationFrame(() => {
-      Animated.spring(animatedValue, {
-        toValue: targetValue,
-        tension: 100,
-        friction: 8,
-        useNativeDriver: false,
-      }).start();
-    });
+    Animated.spring(animatedValue, {
+      toValue: targetValue,
+      tension: 100,
+      friction: 8,
+      useNativeDriver: false,
+    }).start();
   };
 
   const animatePriceChange = (symbol, newPrice, oldPrice) => {
-    // Defer animation to prevent render phase updates
-    requestAnimationFrame(() => {
-      const change = newPrice - oldPrice;
-      const direction = change >= 0 ? 1 : -1;
-      
-      if (priceAnimations.current[symbol]) {
-        Animated.sequence([
-          Animated.timing(priceAnimations.current[symbol], {
-            toValue: direction * 0.1,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.spring(priceAnimations.current[symbol], {
-            toValue: 0,
-            tension: 100,
-            friction: 8,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      }
-    });
+    const change = newPrice - oldPrice;
+    const direction = change >= 0 ? 1 : -1;
+    if (priceAnimations.current[symbol]) {
+      Animated.sequence([
+        Animated.timing(priceAnimations.current[symbol], {
+          toValue: direction * 0.1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(priceAnimations.current[symbol], {
+          toValue: 0,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
   };
 
   const animateButtonPress = (callback) => {
-    // Defer animation to prevent render phase updates
-    requestAnimationFrame(() => {
-      Animated.sequence([
-        Animated.timing(buttonScaleAnim, {
-          toValue: 0.95,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(buttonScaleAnim, {
-          toValue: 1,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        if (callback) callback();
-      });
-    });
+    Animated.sequence([
+      Animated.timing(buttonScaleAnim, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(buttonScaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start(() => callback && callback());
   };
 
-  // Initialize game data on component mount
+  const initDataAndEngine = useCallback((mode, hasEvents) => {
+    if (mode === 'diversified') {
+      const data = getRandomMultiStockPeriod(mode);
+      const engine = hasEvents ? createEventEngine(data.SP500, mode, hasEvents) : null;
+      return { gameData: data, engine };
+    } else {
+      const data = getRandomPeriod(mode);
+      const engine = hasEvents ? createEventEngine(data, mode, hasEvents) : null;
+      return { gameData: data, engine };
+    }
+  }, []);
+
+  const initPortfolios = useCallback((data, mode) => {
+    if (mode === 'diversified') {
+      const perSymbol = INITIAL_CAPITAL / symbols.length;
+      const portfolioState = {};
+      const buyHoldState = {};
+      const prices = {};
+      symbols.forEach(sym => {
+        const startPrice = data[sym][0].value;
+        const shares = perSymbol / startPrice;
+        portfolioState[sym] = { shares, cash: 0 };
+        buyHoldState[sym] = { shares };
+        prices[sym] = startPrice;
+      });
+      return { portfolioState, buyHoldState, currentPrices: prices };
+    } else {
+      const startPrice = data[0].value;
+      const shares = INITIAL_CAPITAL / startPrice;
+      const portfolioState = { SP500: { shares, cash: 0 } };
+      const buyHoldState = { SP500: { shares } };
+      const prices = { SP500: startPrice };
+      return { portfolioState, buyHoldState, currentPrices: prices };
+    }
+  }, [symbols]);
+
+  const resetUiState = useCallback(() => {
+    setCurrentMonth(0);
+    setIsPlaying(false);
+    setIsPaused(false);
+    setGameComplete(false);
+    setShowBonusNotification(false);
+    setCurrentEvent(null);
+    setShowNewsFlash(false);
+    setEventHistory([]);
+  }, []);
+const initializeGame = useCallback(() => {
+    debug('init');
+    const { gameData: data, engine } = initDataAndEngine(gameMode, hasEconomicEvents);
+    setGameData(data);
+    eventEngineRef.current = engine;
+    const { portfolioState, buyHoldState, currentPrices: prices } = initPortfolios(data, gameMode);
+    dispatchPortfolio({ type: 'INIT', payload: portfolioState });
+    dispatchBuyHold({ type: 'INIT', payload: buyHoldState });
+    setCurrentPrices(prices);
+    resetUiState();
+  }, [gameMode, hasEconomicEvents, initDataAndEngine, initPortfolios, resetUiState]);
+
   useEffect(() => {
     initializeGame();
-  }, []);
+  }, [initializeGame]);
 
-  // Cleanup interval on unmount
   useEffect(() => {
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, []);
+    if (!isPlaying) return;
+    intervalRef.current = setInterval(() => {
+      setCurrentMonth(m => m + 1);
+    }, gameSpeed);
+    return () => clearInterval(intervalRef.current);
+  }, [isPlaying, gameSpeed]);
 
-  const initializeGame = () => {
-    if (gameMode === 'diversified') {
-      // Get multi-stock data
-      const selectedData = getRandomMultiStockPeriod(gameMode);
-      setGameData(selectedData);
-      
-      // Initialize event engine with S&P 500 data for consistency
-      if (hasEconomicEvents) {
-        eventEngineRef.current = createEventEngine(selectedData.SP500, gameMode, hasEconomicEvents);
-      }
-      
-      // Initialize diversified portfolio - equal allocation across 5 stocks
-      const initialAllocation = 10000 / 5; // $2000 per stock
-      const initialPortfolio = {};
-      const initialBuyHold = {};
-      const initialPrices = {};
-      
-      Object.keys(selectedData).forEach(symbol => {
-        const startingPrice = selectedData[symbol][0].value;
-        const shares = initialAllocation / startingPrice;
-        
-        initialPortfolio[symbol] = { shares, cash: 0 };
-        initialBuyHold[symbol] = { shares };
-        initialPrices[symbol] = startingPrice;
-      });
-      
-      setPortfolio(initialPortfolio);
-      setBuyHoldPortfolio(initialBuyHold);
-      setCurrentPrices(initialPrices);
-      setPreviousPrices(initialPrices);
-      
-    } else {
-      // Classic and speedrun modes - single stock (S&P 500)
-      const selectedData = getRandomPeriod(gameMode);
-      setGameData(selectedData);
-      
-      // Initialize event engine with S&P 500 data
-      if (hasEconomicEvents) {
-        eventEngineRef.current = createEventEngine(selectedData, gameMode, hasEconomicEvents);
-      }
-      
-      const startingPrice = selectedData[0].value;
-      const startingShares = 10000 / startingPrice;
-      
-      setPlayerShares(startingShares);
-      setBuyHoldShares(startingShares);
-      setPlayerCash(0);
-      setIsInvested(true);
-      setCurrentPrices({ SP500: startingPrice });
-      setPreviousPrices({ SP500: startingPrice });
-    }
-    
-    setCurrentMonth(0);
-    setGameComplete(false);
-    setEventHistory([]);
-  };
-
-  const checkForEconomicEvents = (month) => {
-    if (!eventEngineRef.current || !hasEconomicEvents) return;
-    
-    console.log(`Checking for events at month ${month}`);
-    const event = eventEngineRef.current.checkForEvents(month);
-    
-    if (event) {
-      const formattedEvent = formatEventForDisplay(event);
-      console.log('Event triggered:', formattedEvent);
-      
-      // Add to event history
-      setEventHistory(prev => [...prev, formattedEvent]);
-      
-      // Always show economic events as news flash (consolidated system)
-      console.log('Setting news flash state:', formattedEvent);
-      setCurrentEvent(formattedEvent);
-      setShowNewsFlash(true);
-      console.log('News flash state set - showNewsFlash should be true');
-      
-      // CRITICAL: Pause the game while showing news flash
-      console.log('Pausing game for news flash...');
-      setIsPlaying(false);
-      if (intervalRef.current) {
-        console.log('Clearing game interval');
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    }
-  };
-
-  const dismissNewsFlash = () => {
-    console.log('Dismissing news flash and resuming game...');
-    setShowNewsFlash(false);
-    setCurrentEvent(null);
-    
-    // Resume the game after news flash - but only if it wasn't manually paused
-    if (!isPaused && !gameComplete) {
-      console.log('Resuming game after news flash dismissal');
-      // Small delay to ensure state is updated before restarting
-      setTimeout(() => {
-        setIsPlaying(true);
-        startGame();
-      }, 200);
-    }
-  };
-
-  const handleNewsFlashBuy = () => {
-    if ((gameMode === 'classic' || gameMode === 'speedrun') && !isInvested && playerCash > 0) {
-      const sharesCanBuy = playerCash / currentPrices.SP500;
-      setPlayerShares(sharesCanBuy);
-      setPlayerCash(0);
-      setIsInvested(true);
-      console.log('Bought all shares from news flash');
-    } else if (gameMode === 'diversified') {
-      // For diversified mode, move all cash into stocks
-      setPortfolio(currentPortfolio => {
-        const updatedPortfolio = { ...currentPortfolio };
-        Object.keys(updatedPortfolio).forEach(symbol => {
-          const totalCash = updatedPortfolio[symbol].cash;
-          if (totalCash > 0) {
-            const additionalShares = totalCash / currentPrices[symbol];
-            updatedPortfolio[symbol] = {
-              shares: updatedPortfolio[symbol].shares + additionalShares,
-              cash: 0
-            };
-          }
-        });
-        return updatedPortfolio;
-      });
-    }
-  };
-
-  const handleNewsFlashSell = () => {
-    if ((gameMode === 'classic' || gameMode === 'speedrun') && isInvested && playerShares > 0) {
-      const cashFromSale = playerShares * currentPrices.SP500;
-      setPlayerCash(cashFromSale);
-      setPlayerShares(0);
-      setIsInvested(false);
-      console.log('Sold all shares from news flash');
-    } else if (gameMode === 'diversified') {
-      // For diversified mode, convert all shares to cash
-      setPortfolio(currentPortfolio => {
-        const updatedPortfolio = { ...currentPortfolio };
-        Object.keys(updatedPortfolio).forEach(symbol => {
-          const totalValue = updatedPortfolio[symbol].shares * currentPrices[symbol];
-          updatedPortfolio[symbol] = {
-            shares: 0,
-            cash: updatedPortfolio[symbol].cash + totalValue
-          };
-        });
-        return updatedPortfolio;
-      });
-    }
-  };
-
-  const startGame = () => {
+  useEffect(() => {
     if (!gameData) return;
-    
-    // Clear any existing interval to prevent multiple intervals
-    if (intervalRef.current) {
-      console.log('Clearing existing interval before starting new one');
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    
-    animateButtonPress(() => {
-      setIsPlaying(true);
-      setIsPaused(false);
-      
-      console.log(`Starting game interval with ${gameSpeed}ms speed`);
-      intervalRef.current = setInterval(() => {
-        setCurrentMonth(prev => {
-          const nextMonth = prev + 1;
-          
-          // Check for economic events
-          checkForEconomicEvents(nextMonth);
-          
-          // Check if it's a new year (every 12 months) and not the first month
-          const isNewYear = nextMonth > 0 && (nextMonth % 12) === 0;
-
-          if (isNewYear) {
-            console.log(`Year ${Math.floor(nextMonth / 12)} completed - adding $5000 bonus`);
-            // Add $5000 annual bonus
-            if (gameMode === 'diversified') {
-              // Distribute $1000 to each of 5 stocks
-              console.log('Adding $5000 bonus to diversified portfolio ($1000 per stock)');
-              setPortfolio(currentPortfolio => {
-                const updatedPortfolio = { ...currentPortfolio };
-                Object.keys(updatedPortfolio).forEach(symbol => {
-                  const currentPrice = currentPrices[symbol];
-                  const bonusShares = 1000 / currentPrice;
-                  console.log(`Adding ${bonusShares} shares of ${symbol} at ${currentPrice}`);
-                  updatedPortfolio[symbol] = {
-                    ...updatedPortfolio[symbol],
-                    shares: updatedPortfolio[symbol].shares + bonusShares
-                  };
-                });
-                return updatedPortfolio;
-              });
-              
-              setBuyHoldPortfolio(currentBuyHold => {
-                const updatedBuyHold = { ...currentBuyHold };
-                Object.keys(updatedBuyHold).forEach(symbol => {
-                  const currentPrice = currentPrices[symbol];
-                  const bonusShares = 1000 / currentPrice;
-                  updatedBuyHold[symbol] = {
-                    shares: updatedBuyHold[symbol].shares + bonusShares
-                  };
-                });
-                return updatedBuyHold;
-              });
-              
-            } else {
-              // Classic and speedrun modes
-              console.log('Adding $5000 bonus to classic/speedrun portfolio');
-              if (isInvested) {
-                const bonusShares = 5000 / currentPrices.SP500;
-                console.log(`Adding ${bonusShares} shares of S&P 500 at ${currentPrices.SP500}`);
-                setPlayerShares(currentShares => currentShares + bonusShares);
-              } else {
-                console.log('Adding $5000 cash (player not invested)');
-                setPlayerCash(currentCash => currentCash + 5000);
-              }
-              const buyHoldBonusShares = 5000 / currentPrices.SP500;
-              console.log(`Adding ${buyHoldBonusShares} shares to buy-hold portfolio`);
-              setBuyHoldShares(currentShares => currentShares + buyHoldBonusShares);
-            }
-          }
-
-          if (nextMonth >= gameLength) {
-            // Game complete
-            setIsPlaying(false);
-            setGameComplete(true);
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
-            
-            // Navigate to results after a brief delay
-            setTimeout(() => {
-              navigateToResults();
-            }, 2000);
-            
-            return prev;
-          }
-          
-          // Update market data with animations
-          if (gameMode === 'diversified') {
-            const newPrices = {};
-            const newChanges = {};
-            
-            Object.keys(gameData).forEach(symbol => {
-              const newPrice = gameData[symbol][nextMonth].value;
-              const oldPrice = gameData[symbol][nextMonth - 1].value;
-              const change = ((newPrice - oldPrice) / oldPrice) * 100;
-              
-              newPrices[symbol] = newPrice;
-              newChanges[symbol] = change;
-              
-              // Animate price change
-              animatePriceChange(symbol, newPrice, oldPrice);
-            });
-            
-            setCurrentPrices(newPrices);
-            setPreviousPrices(prev => ({ ...prev, ...Object.fromEntries(
-              Object.keys(gameData).map(symbol => [symbol, gameData[symbol][nextMonth - 1].value])
-            )}));
-            setMonthlyChanges(newChanges);
-            
-          } else {
-            // Classic and speedrun modes
-            const newPrice = gameData[nextMonth].value;
-            const oldPrice = gameData[nextMonth - 1].value;
-            const change = ((newPrice - oldPrice) / oldPrice) * 100;
-            
-            // Animate price change
-            animatePriceChange('SP500', newPrice, oldPrice);
-            
-            setCurrentPrices({ SP500: newPrice });
-            setPreviousPrices({ SP500: oldPrice });
-            setMonthlyChanges({ SP500: change });
-          }
-          
-          return nextMonth;
-        });
-      }, gameSpeed);
-    });
-  };
-
-  const navigateToResults = () => {
-    let finalPlayerValue, finalBuyHoldValue;
-    
+    const newPrices = {};
     if (gameMode === 'diversified') {
-      // Calculate total portfolio values
-      finalPlayerValue = Object.keys(portfolio).reduce((total, symbol) => {
-        return total + (portfolio[symbol].shares * currentPrices[symbol]) + portfolio[symbol].cash;
-      }, 0);
-      
-      finalBuyHoldValue = Object.keys(buyHoldPortfolio).reduce((total, symbol) => {
-        return total + (buyHoldPortfolio[symbol].shares * currentPrices[symbol]);
-      }, 0);
-      
+      symbols.forEach(sym => {
+        const newPrice = gameData[sym][currentMonth].value;
+        const oldPrice = currentMonth > 0 ? gameData[sym][currentMonth - 1].value : newPrice;
+        newPrices[sym] = newPrice;
+        animatePriceChange(sym, newPrice, oldPrice);
+      });
     } else {
-      // Classic mode
-      finalPlayerValue = (playerCash + (playerShares * currentPrices.SP500));
-      finalBuyHoldValue = buyHoldShares * currentPrices.SP500;
+      const newPrice = gameData[currentMonth].value;
+      const oldPrice = currentMonth > 0 ? gameData[currentMonth - 1].value : newPrice;
+      newPrices.SP500 = newPrice;
+      animatePriceChange('SP500', newPrice, oldPrice);
     }
-    
-    const playerReturn = ((finalPlayerValue - 10000) / 10000) * 100;
-    const buyHoldReturn = ((finalBuyHoldValue - 10000) / 10000) * 100;
+    setCurrentPrices(newPrices);
+  }, [currentMonth, gameData, gameMode, symbols]);
 
+  useEffect(() => {
+    if (currentMonth > 0 && currentMonth % 12 === 0) {
+      dispatchPortfolio({ type: 'ADD_ANNUAL_BONUS', prices: currentPrices });
+      dispatchBuyHold({ type: 'ADD_ANNUAL_BONUS', prices: currentPrices });
+      debug('annualBonus', currentMonth);
+      setShowBonusNotification(true);
+      const t = setTimeout(() => setShowBonusNotification(false), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [currentMonth, currentPrices]);
+
+  useEffect(() => {
+    if (!eventEngineRef.current || !hasEconomicEvents) return;
+    const event = eventEngineRef.current.checkForEvents(currentMonth);
+    if (event) {
+            debug('event', formatted);
+      setEventHistory(prev => [...prev, formatted]);
+      setCurrentEvent(formatted);
+      setShowNewsFlash(true);
+      setIsPlaying(false);
+    }
+  }, [currentMonth, hasEconomicEvents]);
+
+  const navigateToResults = useCallback(() => {
+    const playerReturn = ((portfolioValue - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100;
+    const buyHoldReturn = ((buyHoldValue - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100;
     router.push({
       pathname: '/results',
       params: {
-        playerValue: finalPlayerValue,
-        buyHoldValue: finalBuyHoldValue,
-        playerReturn: playerReturn,
-        buyHoldReturn: buyHoldReturn,
-        didWin: finalPlayerValue > finalBuyHoldValue,
-        gameMode: gameMode,
-        gameYears: gameYears,
-        eventsTriggered: eventHistory.length
-      }
+        playerValue: portfolioValue,
+        buyHoldValue,
+        playerReturn,
+        buyHoldReturn,
+        didWin: portfolioValue > buyHoldValue,
+        gameMode,
+        gameYears,
+        eventsTriggered: eventHistory.length,
+      },
+    });
+  }, [portfolioValue, buyHoldValue, gameMode, gameYears, eventHistory.length, router]);
+
+  useEffect(() => {
+    if (currentMonth >= gameLength && !gameComplete) {
+      setIsPlaying(false);
+      setGameComplete(true);
+      const timer = setTimeout(() => navigateToResults(), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [currentMonth, gameLength, navigateToResults, gameComplete]);
+
+  useEffect(() => {
+    animatePortfolioValue(portfolioValueAnim, portfolioValue);
+  }, [portfolioValue]);
+
+  useEffect(() => {
+    animatePortfolioValue(buyHoldValueAnim, buyHoldValue);
+  }, [buyHoldValue]);
+
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: currentMonth / gameLength,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [currentMonth, gameLength]);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.05, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isPlaying]);
+
+  
+  const startGame = () => {
+    debug('startGame');
+    if (!gameData) return;
+    animateButtonPress(() => {
+      setIsPlaying(true);
+      setIsPaused(false);
     });
   };
 
   const pauseGame = () => {
+    debug('pauseGame');
     animateButtonPress(() => {
-      setIsPaused(true);
       setIsPlaying(false);
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    });
-  };
-
-  const resumeGame = () => {
-    animateButtonPress(() => {
-      setIsPaused(false);
-      startGame();
+      setIsPaused(true);
     });
   };
 
   const goToMenu = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-    }
-    
     setShowExitModal(true);
   };
 
-  // Buy/sell functions for all modes
   const buyAll = () => {
-    animateButtonPress(() => {
-      if (gameMode === 'classic' || gameMode === 'speedrun') {
-        // Classic and speedrun both use single S&P 500 stock
-        if (!isInvested && playerCash > 0) {
-          const sharesCanBuy = playerCash / currentPrices.SP500;
-          setPlayerShares(sharesCanBuy);
-          setPlayerCash(0);
-          setIsInvested(true);
-        }
-      } else if (gameMode === 'diversified') {
-        // For diversified mode, move all cash into stocks
-        setPortfolio(currentPortfolio => {
-          const updatedPortfolio = { ...currentPortfolio };
-          Object.keys(updatedPortfolio).forEach(symbol => {
-            const totalCash = updatedPortfolio[symbol].cash;
-            if (totalCash > 0) {
-              const additionalShares = totalCash / currentPrices[symbol];
-              updatedPortfolio[symbol] = {
-                shares: updatedPortfolio[symbol].shares + additionalShares,
-                cash: 0
-              };
-            }
-          });
-          return updatedPortfolio;
-        });
-      }
-    });
+    debug('buyAll');
+    animateButtonPress(() => dispatchPortfolio({ type: 'BUY_ALL', prices: currentPrices }));
   };
 
   const sellAll = () => {
-    animateButtonPress(() => {
-      if (gameMode === 'classic' || gameMode === 'speedrun') {
-        // Classic and speedrun both use single S&P 500 stock
-        if (isInvested && playerShares > 0) {
-          const cashFromSale = playerShares * currentPrices.SP500;
-          setPlayerCash(cashFromSale);
-          setPlayerShares(0);
-          setIsInvested(false);
-        }
-      } else if (gameMode === 'diversified') {
-        // For diversified mode, convert all shares to cash
-        setPortfolio(currentPortfolio => {
-          const updatedPortfolio = { ...currentPortfolio };
-          Object.keys(updatedPortfolio).forEach(symbol => {
-            const totalValue = updatedPortfolio[symbol].shares * currentPrices[symbol];
-            updatedPortfolio[symbol] = {
-              shares: 0,
-              cash: updatedPortfolio[symbol].cash + totalValue
-            };
-          });
-          return updatedPortfolio;
-        });
-      }
-    });
+    debug('sellAll');
+    animateButtonPress(() => dispatchPortfolio({ type: 'SELL_ALL', prices: currentPrices }));
   };
 
-  // Check if user can buy/sell
-  const canBuy = () => {
-    if (gameMode === 'classic' || gameMode === 'speedrun') {
-      return !isInvested && playerCash > 0;
-    } else if (gameMode === 'diversified') {
-      return Object.values(portfolio).some(stock => stock.cash > 0);
-    }
-    return false;
-  };
-
-  const canSell = () => {
-    if (gameMode === 'classic' || gameMode === 'speedrun') {
-      return isInvested && playerShares > 0;
-    } else if (gameMode === 'diversified') {
-      return Object.values(portfolio).some(stock => stock.shares > 0);
-    }
-    return false;
-  };
-
-  // Calculate current portfolio value
-  const getCurrentPortfolioValue = () => {
-    if (gameMode === 'diversified') {
-      return Object.keys(portfolio).reduce((total, symbol) => {
-        return total + (portfolio[symbol].shares * currentPrices[symbol]) + portfolio[symbol].cash;
-      }, 0);
-    } else {
-      return isInvested ? playerShares * currentPrices.SP500 : playerCash;
+  const dismissNewsFlash = () => {
+    setShowNewsFlash(false);
+    setCurrentEvent(null);
+    if (!isPaused && !gameComplete) {
+      setIsPlaying(true);
     }
   };
 
-  // Calculate buy-and-hold comparison
-  const getBuyHoldValue = () => {
-    if (gameMode === 'diversified') {
-      return Object.keys(buyHoldPortfolio).reduce((total, symbol) => {
-        return total + (buyHoldPortfolio[symbol].shares * currentPrices[symbol]);
-      }, 0);
-    } else {
-      return buyHoldShares * currentPrices.SP500;
-    }
-  };
-
-  // Format percentage
   const formatPercentage = (value) => {
     const sign = value >= 0 ? '+' : '';
     return `${sign}${value.toFixed(2)}%`;
   };
 
-  // Generate a random month name to hide the actual date
   const getRandomMonthName = (monthIndex) => {
     const months = [
       'January', 'February', 'March', 'April', 'May', 'June',
@@ -697,9 +436,7 @@ export default function GameScreen() {
   if (!gameData) {
     return (
       <LinearGradient colors={themeColors.background} style={gameStyles.container}>
-        <Animated.View style={[gameStyles.loadingContainer, {
-          transform: [{ scale: pulseAnim }]
-        }]}>
+        <Animated.View style={[gameStyles.loadingContainer, { transform: [{ scale: pulseAnim }] }]}>
           <Text style={gameStyles.loadingText}>Loading game data...</Text>
         </Animated.View>
       </LinearGradient>
@@ -709,8 +446,6 @@ export default function GameScreen() {
   return (
     <LinearGradient colors={themeColors.background} style={gameStyles.container}>
       <ScrollView style={gameStyles.content} showsVerticalScrollIndicator={false}>
-        
-        {/* Game Progress */}
         <GameProgress
           currentMonth={currentMonth}
           gameYears={gameYears}
@@ -721,26 +456,19 @@ export default function GameScreen() {
           gameMode={gameMode}
         />
 
-        {/* Game Mode Badge */}
         <ModeBadge gameMode={gameMode} hasEconomicEvents={hasEconomicEvents} />
 
-        {/* Annual Bonus Notification */}
         {showBonusNotification && (
-          <Animated.View style={[gameStyles.bonusNotification, {
-            transform: [{ scale: pulseAnim }]
-          }]}>
+          <Animated.View style={[gameStyles.bonusNotification, { transform: [{ scale: pulseAnim }] }]}>
             <Ionicons name="gift" size={20} color="#38ef7d" />
             <Text style={gameStyles.bonusText}>
-              💰 Annual Bonus: {formatCurrency(5000)} Added!
+              💰 Annual Bonus: {formatCurrency(ANNUAL_BONUS)} Added!
             </Text>
           </Animated.View>
         )}
 
-        {/* Event History Counter */}
         {hasEconomicEvents && eventHistory.length > 0 && (
-          <Animated.View style={[gameStyles.eventCounter, {
-            transform: [{ scale: pulseAnim }]
-          }]}>
+          <Animated.View style={[gameStyles.eventCounter, { transform: [{ scale: pulseAnim }] }]}>
             <Ionicons name="newspaper" size={16} color="#4facfe" />
             <Text style={gameStyles.eventCounterText}>
               {eventHistory.length} economic event{eventHistory.length !== 1 ? 's' : ''} occurred
@@ -748,7 +476,6 @@ export default function GameScreen() {
           </Animated.View>
         )}
 
-        {/* Market Data */}
         <MarketData
           gameMode={gameMode}
           stockMetadata={stockMetadata}
@@ -759,24 +486,21 @@ export default function GameScreen() {
           formatCurrency={formatCurrency}
         />
 
-        {/* Portfolio Summary */}
         <PortfolioSummary
           formatCurrency={formatCurrency}
           getCurrentPortfolioValue={getCurrentPortfolioValue}
           getBuyHoldValue={getBuyHoldValue}
         />
 
-        {/* Action Buttons - NOW AVAILABLE FOR ALL MODES */}
         <ActionButtons
           isPlaying={isPlaying}
-          canBuy={canBuy()}
-          canSell={canSell()}
+          canBuy={canBuy}
+          canSell={canSell}
           buyAll={buyAll}
           sellAll={sellAll}
           buttonScaleAnim={buttonScaleAnim}
         />
 
-        {/* Game Controls */}
         <GameControls
           isPlaying={isPlaying}
           isPaused={isPaused}
@@ -788,48 +512,33 @@ export default function GameScreen() {
         />
 
         {gameComplete && (
-          <Animated.View style={[gameStyles.completeSection, {
-            transform: [{ scale: pulseAnim }]
-          }]}>
+          <Animated.View style={[gameStyles.completeSection, { transform: [{ scale: pulseAnim }] }]}>
             <Text style={gameStyles.completeTitle}>Game Complete!</Text>
-            <Text style={gameStyles.completeText}>
-              Redirecting to results...
-            </Text>
+            <Text style={gameStyles.completeText}>Redirecting to results...</Text>
           </Animated.View>
         )}
-
       </ScrollView>
-      
-      {/* Custom Modal */}
+
       <CustomModal
         visible={showExitModal}
         type="warning"
         title="Return to Menu?"
         message="Are you sure you want to leave? Your current game progress will be lost."
         buttons={[
-          { 
-            text: "Cancel", 
-            style: "cancel", 
-            onPress: () => setShowExitModal(false) 
-          },
-          { 
-            text: "Yes, Leave Game", 
-            style: "destructive", 
-            onPress: () => router.push('/') 
-          }
+          { text: 'Cancel', style: 'cancel', onPress: () => setShowExitModal(false) },
+          { text: 'Yes, Leave Game', style: 'destructive', onPress: () => router.push('/') },
         ]}
         onDismiss={() => setShowExitModal(false)}
       />
-      
-      {/* News Flash Overlay with improved positioning */}
-      <NewsFlash 
+
+      <NewsFlash
         event={currentEvent}
         visible={showNewsFlash}
         onDismiss={dismissNewsFlash}
-        onBuy={handleNewsFlashBuy}
-        onSell={handleNewsFlashSell}
-        canBuy={canBuy()}
-        canSell={canSell()}
+        onBuy={buyAll}
+        onSell={sellAll}
+        canBuy={canBuy}
+        canSell={canSell}
         gameMode={gameMode}
       />
     </LinearGradient>
