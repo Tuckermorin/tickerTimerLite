@@ -1,5 +1,5 @@
 // utils/economicEvents.js
-// Simplified economic events that correspond to actual market periods
+// Economic events with configurable count for different game modes
 
 export const economicEvents = [
   // Presidential Elections (every 4 years)
@@ -45,44 +45,64 @@ export const economicEvents = [
   { event: "Market sentiment improves on economic optimism", sentiment: "positive", type: "market" }
 ];
 
-// Helper function to get random events for a game
-export const getRandomEventsForGame = (gameLength) => {
-  // Always include some key event types
-  const guaranteedTypes = ['election', 'fed', 'crisis'];
-  const guaranteedEvents = [];
-  
-  // Get at least one of each guaranteed type
-  guaranteedTypes.forEach(type => {
-    const typeEvents = economicEvents.filter(e => e.type === type);
-    if (typeEvents.length > 0) {
-      const randomEvent = typeEvents[Math.floor(Math.random() * typeEvents.length)];
-      guaranteedEvents.push(randomEvent);
-    }
-  });
-  
-  // Fill the rest randomly up to 10 total events
-  const remainingSlots = 10 - guaranteedEvents.length;
-  const availableEvents = economicEvents.filter(event => 
-    !guaranteedEvents.some(ge => ge.event === event.event)
-  );
-  
-  const shuffled = availableEvents.sort(() => 0.5 - Math.random());
-  const additionalEvents = shuffled.slice(0, remainingSlots);
-  
-  const allSelectedEvents = [...guaranteedEvents, ...additionalEvents];
-  
-  // Assign random months to events, ensuring they're spread out
-  return allSelectedEvents.map((event, index) => {
-    // Spread events across the game timeline
-    const monthSpacing = Math.floor(gameLength / 10);
-    const baseMonth = monthSpacing * index + Math.floor(Math.random() * (monthSpacing * 0.8));
-    const triggerMonth = Math.min(baseMonth, gameLength - 1);
+// Helper function to get random events for a game with configurable count
+export const getRandomEventsForGame = (gameLength, eventCount = 10) => {
+  // Always include some key event types for longer games
+  if (eventCount >= 5) {
+    const guaranteedTypes = ['election', 'fed', 'crisis'];
+    const guaranteedEvents = [];
     
-    return {
-      ...event,
-      triggerMonth
-    };
-  }).sort((a, b) => a.triggerMonth - b.triggerMonth);
+    // Get at least one of each guaranteed type
+    guaranteedTypes.forEach(type => {
+      const typeEvents = economicEvents.filter(e => e.type === type);
+      if (typeEvents.length > 0) {
+        const randomEvent = typeEvents[Math.floor(Math.random() * typeEvents.length)];
+        guaranteedEvents.push(randomEvent);
+      }
+    });
+    
+    // Fill the rest randomly up to the desired event count
+    const remainingSlots = eventCount - guaranteedEvents.length;
+    const availableEvents = economicEvents.filter(event => 
+      !guaranteedEvents.some(ge => ge.event === event.event)
+    );
+    
+    const shuffled = availableEvents.sort(() => 0.5 - Math.random());
+    const additionalEvents = shuffled.slice(0, remainingSlots);
+    
+    const allSelectedEvents = [...guaranteedEvents, ...additionalEvents];
+    
+    // Assign random months to events, ensuring they're spread out
+    return allSelectedEvents.map((event, index) => {
+      // Spread events across the game timeline
+      const monthSpacing = Math.floor(gameLength / eventCount);
+      const baseMonth = monthSpacing * index + Math.floor(Math.random() * (monthSpacing * 0.8));
+      const triggerMonth = Math.min(baseMonth, gameLength - 1);
+      
+      return {
+        ...event,
+        triggerMonth
+      };
+    }).sort((a, b) => a.triggerMonth - b.triggerMonth);
+  } else {
+    // For speed mode (5 events), just pick 5 random events
+    const shuffled = economicEvents.sort(() => 0.5 - Math.random());
+    const selectedEvents = shuffled.slice(0, eventCount);
+    
+    // Spread them evenly across the timeline
+    return selectedEvents.map((event, index) => {
+      const monthSpacing = Math.floor(gameLength / eventCount);
+      const triggerMonth = Math.min(
+        monthSpacing * index + Math.floor(Math.random() * (monthSpacing * 0.8)),
+        gameLength - 1
+      );
+      
+      return {
+        ...event,
+        triggerMonth
+      };
+    }).sort((a, b) => a.triggerMonth - b.triggerMonth);
+  }
 };
 
 // Map sentiment to colors

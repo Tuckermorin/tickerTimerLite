@@ -1,5 +1,5 @@
 // utils/eventEngine.js
-// Fixed event engine with proper formatting
+// Fixed event engine with speed mode support (5 events instead of 10)
 
 import { getRandomEventsForGame } from './economicEvents';
 
@@ -17,13 +17,14 @@ export class EventEngine {
   }
 
   initializeEvents() {
-    console.log('Initializing event engine with 10 random events...');
-    
-    // Determine game length
+    // Determine game length and event count based on mode
     const gameLength = this.gameMode === 'speedrun' ? 120 : 240; // 10 or 20 years in months
+    const eventCount = this.gameMode === 'speedrun' ? 5 : 10; // 5 events for speed mode, 10 for others
     
-    // Get exactly 10 random events spread throughout the game
-    this.events = getRandomEventsForGame(gameLength);
+    console.log(`Initializing event engine with ${eventCount} random events for ${this.gameMode} mode...`);
+    
+    // Get random events for the game
+    this.events = getRandomEventsForGame(gameLength, eventCount);
     
     console.log(`EventEngine: Initialized with ${this.events.length} events:`);
     this.events.forEach((event, index) => {

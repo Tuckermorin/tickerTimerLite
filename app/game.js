@@ -1,5 +1,5 @@
 // app/game.js
-// Fixed game screen with proper speed run mode and event handling
+// Fixed game screen with optimized speed mode to prevent useInsertionEffect warnings
 
 import React, { useState, useEffect, useRef, useReducer, useMemo, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, Animated } from 'react-native';
@@ -90,14 +90,18 @@ export default function GameScreen() {
 
   const intervalRef = useRef(null);
   const eventEngineRef = useRef(null);
-  const navigationTimeoutRef = useRef(null);
 
+  // Simplified animation refs - reduce animations in speed mode
   const priceAnimations = useRef({});
   const portfolioValueAnim = useRef(new Animated.Value(0)).current;
   const buyHoldValueAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const buttonScaleAnim = useRef(new Animated.Value(1)).current;
+
+  // Static values for speed mode
+  const staticPulseValue = 1;
+  const staticButtonScale = 1;
 
   const gameMode = params.mode || 'classic';
   const hasEconomicEvents = params.economicEvents === 'true';
@@ -106,12 +110,16 @@ export default function GameScreen() {
   const gameLength = DURATIONS[gameMode] || DURATIONS.classic;
   const gameYears = gameLength / 12;
 
+  // Determine if we should reduce animations for performance
+  const isSpeedMode = gameMode === 'speedrun';
+
   const [gameData, setGameData] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [gameComplete, setGameComplete] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
 
   const [currentEvent, setCurrentEvent] = useState(null);
   const [showNewsFlash, setShowNewsFlash] = useState(false);
@@ -170,8 +178,14 @@ export default function GameScreen() {
   const getCurrentPortfolioValue = useCallback(() => portfolioValue, [portfolioValue]);
   const getBuyHoldValue = useCallback(() => buyHoldValue, [buyHoldValue]);
 
+  // Optimized animation function - skip animations in speed mode
   const animatePortfolioValue = useCallback((animatedValue, targetValue) => {
-    // Use requestAnimationFrame to avoid render phase updates
+    if (isSpeedMode) {
+      // Skip animations in speed mode to prevent performance issues
+      animatedValue.setValue(targetValue);
+      return;
+    }
+    
     requestAnimationFrame(() => {
       Animated.spring(animatedValue, {
         toValue: targetValue,
@@ -180,13 +194,15 @@ export default function GameScreen() {
         useNativeDriver: false,
       }).start();
     });
-  }, []);
+  }, [isSpeedMode]);
 
+  // Simplified price animation - skip in speed mode
   const animatePriceChange = useCallback((symbol, newPrice, oldPrice) => {
+    if (isSpeedMode) return; // Skip price animations in speed mode
+    
     const change = newPrice - oldPrice;
     const direction = change >= 0 ? 1 : -1;
     if (priceAnimations.current[symbol]) {
-      // Use requestAnimationFrame to avoid render phase updates
       requestAnimationFrame(() => {
         Animated.sequence([
           Animated.timing(priceAnimations.current[symbol], {
@@ -203,10 +219,16 @@ export default function GameScreen() {
         ]).start();
       });
     }
-  }, []);
+  }, [isSpeedMode]);
 
+  // Simplified button animation
   const animateButtonPress = useCallback((callback) => {
-    // Use requestAnimationFrame to avoid render phase updates
+    if (isSpeedMode) {
+      // Skip button animations in speed mode
+      callback && callback();
+      return;
+    }
+    
     requestAnimationFrame(() => {
       Animated.sequence([
         Animated.timing(buttonScaleAnim, {
@@ -221,7 +243,7 @@ export default function GameScreen() {
         }),
       ]).start(() => callback && callback());
     });
-  }, [buttonScaleAnim]);
+  }, [buttonScaleAnim, isSpeedMode]);
 
   const initDataAndEngine = useCallback((mode, hasEvents) => {
     if (mode === 'diversified') {
@@ -264,6 +286,7 @@ export default function GameScreen() {
     setIsPlaying(false);
     setIsPaused(false);
     setGameComplete(false);
+    setGameStarted(false);
     setCurrentEvent(null);
     setShowNewsFlash(false);
     setEventHistory([]);
@@ -286,7 +309,7 @@ export default function GameScreen() {
     initializeGame();
   }, [initializeGame]);
 
-  // Main game loop
+  // Optimized game loop - batch updates in speed mode
   useEffect(() => {
     if (!isPlaying || gameComplete || isNavigating) return;
     
@@ -306,7 +329,7 @@ export default function GameScreen() {
     };
   }, [isPlaying, gameComplete, isNavigating, gameSpeed, gameLength]);
 
-  // Update prices when month changes
+  // Optimized price updates - batch in speed mode
   useEffect(() => {
     if (!gameData || currentMonth >= gameLength) return;
     
@@ -316,16 +339,22 @@ export default function GameScreen() {
         const newPrice = gameData[sym][currentMonth].value;
         const oldPrice = currentMonth > 0 ? gameData[sym][currentMonth - 1].value : newPrice;
         newPrices[sym] = newPrice;
-        animatePriceChange(sym, newPrice, oldPrice);
+        if (!isSpeedMode) {
+          animatePriceChange(sym, newPrice, oldPrice);
+        }
       });
     } else {
       const newPrice = gameData[currentMonth].value;
       const oldPrice = currentMonth > 0 ? gameData[currentMonth - 1].value : newPrice;
       newPrices.SP500 = newPrice;
-      animatePriceChange('SP500', newPrice, oldPrice);
+      if (!isSpeedMode) {
+        animatePriceChange('SP500', newPrice, oldPrice);
+      }
     }
+    
+    // Batch price update
     setCurrentPrices(newPrices);
-  }, [currentMonth, gameData, gameMode, symbols, gameLength]);
+  }, [currentMonth, gameData, gameMode, symbols, gameLength, isSpeedMode, animatePriceChange]);
 
   // Handle annual bonuses
   useEffect(() => {
@@ -336,7 +365,7 @@ export default function GameScreen() {
     }
   }, [currentMonth, currentPrices, gameLength]);
 
-  // Handle economic events
+  // Handle economic events - always pause for events
   useEffect(() => {
     if (!eventEngineRef.current || !hasEconomicEvents || gameComplete || isNavigating) return;
     
@@ -347,34 +376,44 @@ export default function GameScreen() {
       setEventHistory(prev => [...prev, formatted]);
       setCurrentEvent(formatted);
       setShowNewsFlash(true);
-      setIsPlaying(false); // Pause game for event
+      setIsPlaying(false); // Always pause game for events
     }
   }, [currentMonth, hasEconomicEvents, gameComplete, isNavigating]);
 
   const navigateToResults = useCallback(() => {
-    if (isNavigating) return;
+    if (isNavigating) {
+      debug('Navigation blocked - already navigating');
+      return;
+    }
+    
+    debug('navigateToResults called', { 
+      portfolioValue, 
+      buyHoldValue, 
+      gameMode, 
+      gameYears
+    });
     
     setIsNavigating(true);
-    setIsPlaying(false);
     
     const playerReturn = ((portfolioValue - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100;
     const buyHoldReturn = ((buyHoldValue - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100;
     
-    navigationTimeoutRef.current = setTimeout(() => {
-      router.push({
-        pathname: '/results',
-        params: {
-          playerValue: portfolioValue,
-          buyHoldValue,
-          playerReturn,
-          buyHoldReturn,
-          didWin: portfolioValue > buyHoldValue,
-          gameMode,
-          gameYears,
-          eventsTriggered: eventHistory.length,
-        },
-      });
-    }, 1000);
+    const navigateParams = {
+      pathname: '/results',
+      params: {
+        playerValue: portfolioValue.toFixed(2),
+        buyHoldValue: buyHoldValue.toFixed(2),
+        playerReturn: playerReturn.toFixed(2),
+        buyHoldReturn: buyHoldReturn.toFixed(2),
+        didWin: (portfolioValue > buyHoldValue).toString(),
+        gameMode,
+        gameYears: gameYears.toString(),
+        eventsTriggered: eventHistory.length.toString(),
+      },
+    };
+    
+    debug('Navigation params:', navigateParams);
+    router.push(navigateParams);
   }, [portfolioValue, buyHoldValue, gameMode, gameYears, eventHistory.length, router, isNavigating]);
 
   // Handle game completion
@@ -386,22 +425,22 @@ export default function GameScreen() {
     }
   }, [currentMonth, gameLength, gameComplete, isNavigating, navigateToResults]);
 
+  // Simplified portfolio value animations
   useEffect(() => {
-    // Use requestAnimationFrame to defer animation start
-    requestAnimationFrame(() => {
-      animatePortfolioValue(portfolioValueAnim, portfolioValue);
-    });
+    animatePortfolioValue(portfolioValueAnim, portfolioValue);
   }, [portfolioValue, animatePortfolioValue]);
 
   useEffect(() => {
-    // Use requestAnimationFrame to defer animation start
-    requestAnimationFrame(() => {
-      animatePortfolioValue(buyHoldValueAnim, buyHoldValue);
-    });
+    animatePortfolioValue(buyHoldValueAnim, buyHoldValue);
   }, [buyHoldValue, animatePortfolioValue]);
 
+  // Simplified progress animation
   useEffect(() => {
-    // Use requestAnimationFrame to defer animation start
+    if (isSpeedMode) {
+      progressAnim.setValue(currentMonth / gameLength);
+      return;
+    }
+    
     requestAnimationFrame(() => {
       Animated.timing(progressAnim, {
         toValue: currentMonth / gameLength,
@@ -409,12 +448,12 @@ export default function GameScreen() {
         useNativeDriver: false,
       }).start();
     });
-  }, [currentMonth, gameLength, progressAnim]);
+  }, [currentMonth, gameLength, progressAnim, isSpeedMode]);
 
+  // Simplified pulse animation - skip in speed mode
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!isPlaying || isSpeedMode) return;
     
-    // Use a more stable animation loop
     const startPulseAnimation = () => {
       const pulse = Animated.loop(
         Animated.sequence([
@@ -437,18 +476,15 @@ export default function GameScreen() {
     const pulseAnimation = startPulseAnimation();
     return () => {
       pulseAnimation.stop();
-      pulseAnim.setValue(1); // Reset to default value
+      pulseAnim.setValue(1);
     };
-  }, [isPlaying, pulseAnim]);
+  }, [isPlaying, pulseAnim, isSpeedMode]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
-      }
-      if (navigationTimeoutRef.current) {
-        clearTimeout(navigationTimeoutRef.current);
       }
     };
   }, []);
@@ -459,6 +495,7 @@ export default function GameScreen() {
     animateButtonPress(() => {
       setIsPlaying(true);
       setIsPaused(false);
+      setGameStarted(true);
     });
   };
 
@@ -488,6 +525,7 @@ export default function GameScreen() {
   const dismissNewsFlash = () => {
     setShowNewsFlash(false);
     setCurrentEvent(null);
+    // Always resume game after dismissing news flash if it was playing before
     if (!isPaused && !gameComplete && !isNavigating) {
       setIsPlaying(true);
     }
@@ -509,9 +547,12 @@ export default function GameScreen() {
   if (!gameData) {
     return (
       <LinearGradient colors={themeColors.background} style={gameStyles.container}>
-        <Animated.View style={[gameStyles.loadingContainer, { transform: [{ scale: pulseAnim }] }]}>
+        <View style={[
+          gameStyles.loadingContainer, 
+          isSpeedMode ? {} : { transform: [{ scale: pulseAnim }] }
+        ]}>
           <Text style={gameStyles.loadingText}>Loading game data...</Text>
-        </Animated.View>
+        </View>
       </LinearGradient>
     );
   }
@@ -524,7 +565,7 @@ export default function GameScreen() {
           gameYears={gameYears}
           monthName={getRandomMonthName(currentMonth)}
           isPlaying={isPlaying}
-          pulseAnim={pulseAnim}
+          pulseAnim={isSpeedMode ? staticPulseValue : pulseAnim}
           progressAnim={progressAnim}
           gameMode={gameMode}
         />
@@ -532,18 +573,21 @@ export default function GameScreen() {
         <ModeBadge gameMode={gameMode} hasEconomicEvents={hasEconomicEvents} />
 
         {hasEconomicEvents && eventHistory.length > 0 && (
-          <Animated.View style={[gameStyles.eventCounter, { transform: [{ scale: pulseAnim }] }]}>
+          <View style={[
+            gameStyles.eventCounter, 
+            isSpeedMode ? {} : { transform: [{ scale: pulseAnim }] }
+          ]}>
             <Ionicons name="newspaper" size={16} color="#4facfe" />
             <Text style={gameStyles.eventCounterText}>
               {eventHistory.length} economic event{eventHistory.length !== 1 ? 's' : ''} occurred
             </Text>
-          </Animated.View>
+          </View>
         )}
 
         <MarketData
           gameMode={gameMode}
           stockMetadata={stockMetadata}
-          priceAnimations={priceAnimations}
+          priceAnimations={isSpeedMode ? { current: {} } : priceAnimations}
           monthlyChanges={monthlyChanges}
           currentPrices={currentPrices}
           formatPercentage={formatPercentage}
@@ -562,7 +606,8 @@ export default function GameScreen() {
           canSell={canSell}
           buyAll={buyAll}
           sellAll={sellAll}
-          buttonScaleAnim={buttonScaleAnim}
+          buttonScaleAnim={isSpeedMode ? staticButtonScale : buttonScaleAnim}
+          gameStarted={gameStarted}
         />
 
         <GameControls
@@ -572,14 +617,17 @@ export default function GameScreen() {
           startGame={startGame}
           pauseGame={pauseGame}
           goToMenu={goToMenu}
-          buttonScaleAnim={buttonScaleAnim}
+          buttonScaleAnim={isSpeedMode ? staticButtonScale : buttonScaleAnim}
         />
 
         {gameComplete && !isNavigating && (
-          <Animated.View style={[gameStyles.completeSection, { transform: [{ scale: pulseAnim }] }]}>
+          <View style={[
+            gameStyles.completeSection, 
+            isSpeedMode ? {} : { transform: [{ scale: pulseAnim }] }
+          ]}>
             <Text style={gameStyles.completeTitle}>Game Complete!</Text>
             <Text style={gameStyles.completeText}>Calculating results...</Text>
-          </Animated.View>
+          </View>
         )}
       </ScrollView>
 

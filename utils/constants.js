@@ -1,12 +1,12 @@
 // utils/constants.js
-// Fixed constants with proper speed run timing
+// Fixed constants with 1.5x speed for speed run
 
 export const INITIAL_CAPITAL = 10000;
 export const ANNUAL_BONUS = 5000;
 
-// Fixed speeds - speedrun should be faster (lower number = faster)
+// Fixed speeds - speedrun should be 1.5x faster (667ms vs 1000ms)
 export const SPEEDS = { 
-  speedrun: 300,  // 300ms intervals (faster)
+  speedrun: 667,  // 667ms intervals (1.5x faster than 1000ms)
   classic: 1000,  // 1000ms intervals (normal)
   diversified: 1000 // 1000ms intervals (normal)
 };

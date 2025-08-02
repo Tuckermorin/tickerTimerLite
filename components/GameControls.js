@@ -13,27 +13,37 @@ export default function GameControls({
   goToMenu,
   buttonScaleAnim,
 }) {
+  // Handle both animated values and static numbers for buttonScaleAnim
+  const renderAnimatedButton = (onPress, style, icon, text) => {
+    const buttonContent = (
+      <Pressable style={style} onPress={onPress}>
+        <Ionicons name={icon} size={20} color="#fff" />
+        <Text style={gameStyles.controlButtonText}>{text}</Text>
+      </Pressable>
+    );
+
+    // If buttonScaleAnim is a number (speed mode), use regular View
+    if (typeof buttonScaleAnim === 'number') {
+      return buttonContent;
+    }
+
+    // If buttonScaleAnim is an animated value, use Animated.View
+    return (
+      <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
+        {buttonContent}
+      </Animated.View>
+    );
+  };
+
   return (
     <View style={gameStyles.controlSection}>
-      {!isPlaying && !gameComplete && (
-        <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
-          <Pressable style={gameStyles.controlButton} onPress={startGame}>
-            <Ionicons name="play" size={20} color="#fff" />
-            <Text style={gameStyles.controlButtonText}>
-              {isPaused ? 'Resume' : 'Start Game'}
-            </Text>
-          </Pressable>
-        </Animated.View>
-      )}
+      {!isPlaying && !gameComplete && 
+        renderAnimatedButton(startGame, gameStyles.controlButton, "play", isPaused ? 'Resume' : 'Start Game')
+      }
 
-      {isPlaying && (
-        <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
-          <Pressable style={gameStyles.controlButton} onPress={pauseGame}>
-            <Ionicons name="pause" size={20} color="#fff" />
-            <Text style={gameStyles.controlButtonText}>Pause</Text>
-          </Pressable>
-        </Animated.View>
-      )}
+      {isPlaying && 
+        renderAnimatedButton(pauseGame, gameStyles.controlButton, "pause", "Pause")
+      }
 
       <Pressable style={gameStyles.menuButton} onPress={goToMenu}>
         <Ionicons name="home" size={20} color="#fff" />
@@ -42,4 +52,3 @@ export default function GameControls({
     </View>
   );
 }
-
