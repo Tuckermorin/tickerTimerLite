@@ -460,17 +460,12 @@ export const homeStyles = StyleSheet.create({
     lineHeight: 18,
     opacity: 0.8,
   },
-});
 
-// styles/homeStyles.js (additions for light mode support)
-// Add these styles to your existing homeStyles.js file
-
-// Settings button styles
-export const settingsButtonStyles = {
+  // Settings button styles
   settingsButtonContainer: {
     position: 'absolute',
     top: 50, // Reduced from 60 to bring it down
-    right: 20,
+    left: 20,
     zIndex: 1000,
   },
   settingsButton: {
@@ -492,7 +487,7 @@ export const settingsButtonStyles = {
     backgroundColor: 'rgba(0,0,0,0.05)',
     borderColor: 'rgba(0,0,0,0.1)',
   },
-  
+
   // Light mode overrides for existing styles
   heroIconLight: {
     backgroundColor: 'rgba(79, 172, 254, 0.1)',
@@ -577,4 +572,5 @@ export const settingsButtonStyles = {
   disclaimerTextLight: {
     color: '#6c757d',
   },
-};
+});
+
